@@ -94,8 +94,8 @@ export function SmartNavbar() {
   };
 
   const handleLogout = () => {
-    document.cookie = "unihire_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/";
-    document.cookie = "unihire_role=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/";
+    document.cookie = "univhire_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/";
+    document.cookie = "univhire_role=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/";
     logout();
     navigate("/");
     setAvatarOpen(false);
@@ -128,7 +128,7 @@ export function SmartNavbar() {
             <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-secondary text-white">
               <GraduationCap size={15} />
             </span>
-            <span className="text-lg font-bold text-white tracking-tight">UniHire</span>
+            <span className="text-lg font-bold text-white tracking-tight">UnivHire</span>
           </button>
 
           {/* Desktop nav links */}

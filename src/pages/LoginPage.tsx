@@ -43,8 +43,8 @@ export function LoginPage() {
     const demo = DEMO_ACCOUNTS[email.toLowerCase()];
     if (demo && password.length >= 4) {
       const fakeToken = btoa(`${demo.role}:${Date.now()}`);
-      document.cookie = `unihire_token=${fakeToken}; path=/`;
-      document.cookie = `unihire_role=${demo.role}; path=/`;
+      document.cookie = `univhire_token=${fakeToken}; path=/`;
+      document.cookie = `univhire_role=${demo.role}; path=/`;
       setAuth(fakeToken, demo.role, demo.user);
 
       const dest = returnUrl
@@ -68,7 +68,7 @@ export function LoginPage() {
       {/* Back to home */}
       <Link to="/" className="mb-8 flex items-center gap-2 text-sm text-foreground/60 hover:text-foreground transition">
         <GraduationCap size={16} />
-        <span className="font-bold text-foreground">UniHire</span>
+        <span className="font-bold text-foreground">UnivHire</span>
       </Link>
 
       <motion.div
@@ -131,7 +131,7 @@ export function LoginPage() {
         </form>
 
         <p className="mt-6 text-center text-sm text-muted-foreground">
-          New to UniHire?{" "}
+          New to UnivHire?{" "}
           <Link to="/signup" className="font-semibold text-foreground hover:underline">
             Create account
           </Link>

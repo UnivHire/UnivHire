@@ -11,7 +11,7 @@ Keep entries sorted in DESC order (newest first) so recent knowledge stays in pr
 </instructions>
 
 <coder>
-# UniHire Project — Coder Notes
+# UnivHire Project — Coder Notes
 
 ## SDK Version Critical
 - ALWAYS use `"@animaapp/playground-react-sdk": "0.10.0"` (exact, no caret). `^0.12.x` breaks AnimaProvider.

@@ -75,8 +75,8 @@ export function SignupPage() {
 
     const fakeToken = btoa(`candidate:${Date.now()}`);
     const user: AuthUser = { id: `u_${Date.now()}`, name, email, roleType: selectedRole };
-    document.cookie = `unihire_token=${fakeToken}; path=/`;
-    document.cookie = `unihire_role=candidate; path=/`;
+    document.cookie = `univhire_token=${fakeToken}; path=/`;
+    document.cookie = `univhire_role=candidate; path=/`;
     setAuth(fakeToken, "candidate", user);
     navigate("/dashboard", { replace: true });
     setLoading(false);
@@ -86,7 +86,7 @@ export function SignupPage() {
     <div className="min-h-screen bg-[#ECEEF0] flex flex-col items-center justify-center px-4 py-16">
       <Link to="/" className="mb-8 flex items-center gap-2 text-sm text-foreground/60 hover:text-foreground transition">
         <GraduationCap size={16} />
-        <span className="font-bold text-foreground">UniHire</span>
+        <span className="font-bold text-foreground">UnivHire</span>
       </Link>
 
       <motion.div

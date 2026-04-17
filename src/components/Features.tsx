@@ -18,7 +18,7 @@ export function Features() {
         <div className="mb-10 max-w-2xl">
           <h2 className="section-title">Feature architecture built for trust and clarity</h2>
           <p className="section-copy mt-3">
-            Luxury in interface, discipline in information. UniHire balances prestige with practical hiring workflows.
+            Luxury in interface, discipline in information. UnivHire balances prestige with practical hiring workflows.
           </p>
         </div>
 

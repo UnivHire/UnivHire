@@ -21,8 +21,8 @@ export function InvitePage() {
     await new Promise((r) => setTimeout(r, 800));
     const fakeToken = btoa(`hr:${Date.now()}`);
     const user: AuthUser = { id: `hr_${Date.now()}`, name, email: "hr@invited.com", university };
-    document.cookie = `unihire_token=${fakeToken}; path=/`;
-    document.cookie = `unihire_role=hr; path=/`;
+    document.cookie = `univhire_token=${fakeToken}; path=/`;
+    document.cookie = `univhire_role=hr; path=/`;
     setAuth(fakeToken, "hr", user);
     navigate("/hr/dashboard", { replace: true });
     setLoading(false);
@@ -32,7 +32,7 @@ export function InvitePage() {
     <div className="min-h-screen bg-[#ECEEF0] flex flex-col items-center justify-center px-4 py-16">
       <Link to="/" className="mb-8 flex items-center gap-2">
         <GraduationCap size={16} />
-        <span className="font-bold text-foreground">UniHire</span>
+        <span className="font-bold text-foreground">UnivHire</span>
       </Link>
       <motion.div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-sm"
         initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>

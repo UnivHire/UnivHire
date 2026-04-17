@@ -28,6 +28,6 @@ export const useAuthStore = create<AuthState>()(
       setAuth: (token, role, user) => set({ token, role, user }),
       logout: () => set({ token: null, role: null, user: null }),
     }),
-    { name: "unihire-auth" }
+    { name: "univhire-auth" }
   )
 );

@@ -103,7 +103,7 @@ export function Hero() {
               <div className="absolute -right-4 -bottom-10 h-40 w-40 rounded-full border border-white/10" />
               <div className="absolute right-2 bottom-2 h-16 w-16 rounded-full border border-white/10" />
               <p className="relative mb-6 text-xl font-bold leading-snug">
-                Get Your best<br />profession<br />with <span className="text-secondary">UniHire</span>
+                Get Your best<br />profession<br />with <span className="text-secondary">UnivHire</span>
               </p>
               <button
                 type="button"

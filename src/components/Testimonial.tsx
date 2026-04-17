@@ -5,7 +5,7 @@ export function Testimonial() {
         <div className="mb-10 text-center">
           <h2 className="section-title">A platform language HR teams can trust</h2>
           <p className="section-copy mt-3">
-            UniHire is designed to feel institutional and humane, helping teams move faster without losing credibility.
+            UnivHire is designed to feel institutional and humane, helping teams move faster without losing credibility.
           </p>
         </div>
 
@@ -16,7 +16,7 @@ export function Testimonial() {
             ))}
           </div>
           <p className="mb-8 text-xl font-medium leading-9 text-foreground md:text-2xl">
-            &#34;UniHire gives us one serious, elegant place to publish verified openings. The clarity matters not only for faculty roles, but also for the operational positions that often go unseen on traditional career portals.&#34;
+            &#34;UnivHire gives us one serious, elegant place to publish verified openings. The clarity matters not only for faculty roles, but also for the operational positions that often go unseen on traditional career portals.&#34;
           </p>
           <div className="flex flex-col gap-5 md:flex-row md:items-center">
             <img

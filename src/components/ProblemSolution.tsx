@@ -22,7 +22,7 @@ export function ProblemSolution() {
         <div className="mb-10 max-w-2xl">
           <h2 className="section-title">From fragmented hiring to one credible flow</h2>
           <p className="section-copy mt-3">
-            UniHire replaces scattered recruitment with a trusted hiring layer built for India&#39;s higher education ecosystem.
+            UnivHire replaces scattered recruitment with a trusted hiring layer built for India&#39;s higher education ecosystem.
           </p>
         </div>
 

@@ -56,7 +56,7 @@ export function Navbar() {
             <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-secondary text-white">
               <GraduationCap size={15} />
             </span>
-            <span className="text-lg font-bold text-white tracking-tight">UniHire</span>
+            <span className="text-lg font-bold text-white tracking-tight">UnivHire</span>
           </button>
 
           {/* Desktop nav links */}

@@ -17,7 +17,7 @@ export function Footer() {
     <footer className="border-t border-border bg-white">
       <div className="mx-auto grid max-w-content gap-10 px-8 py-14 md:px-12 lg:grid-cols-3">
         <div className="space-y-3">
-          <p className="text-2xl font-bold text-foreground">UniHire</p>
+          <p className="text-2xl font-bold text-foreground">UnivHire</p>
           <p className="max-w-sm text-sm leading-7 text-muted-foreground">
             India&#39;s first centralized hiring platform for verified university opportunities across academic and campus operations roles.
           </p>
@@ -66,7 +66,7 @@ export function Footer() {
       </div>
 
       <div className="border-t border-border px-8 py-5 text-center md:px-12">
-        <p className="text-xs text-muted-foreground">© 2026 UniHire. All rights reserved.</p>
+        <p className="text-xs text-muted-foreground">© 2026 UnivHire. All rights reserved.</p>
       </div>
     </footer>
   );
