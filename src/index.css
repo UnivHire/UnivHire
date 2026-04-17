@@ -1,0 +1,103 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* LuckyJob palette */
+  --color-background: 214 22% 90%;
+  --color-foreground: 220 20% 10%;
+  --color-card: 0 0% 100%;
+  --color-card-foreground: 220 20% 10%;
+  --color-popover: 0 0% 100%;
+  --color-popover-foreground: 220 20% 10%;
+  /* Primary = near-black (navbar, buttons) */
+  --color-primary: 220 20% 10%;
+  --color-primary-foreground: 0 0% 100%;
+  /* Secondary = sky blue accent */
+  --color-secondary: 199 90% 56%;
+  --color-secondary-foreground: 0 0% 100%;
+  /* Tertiary = warm amber */
+  --color-tertiary: 38 92% 60%;
+  --color-tertiary-foreground: 220 20% 10%;
+  --color-muted: 214 18% 84%;
+  --color-muted-foreground: 220 10% 50%;
+  --color-accent: 199 90% 56%;
+  --color-accent-foreground: 0 0% 100%;
+  --color-border: 214 16% 80%;
+  --color-input: 214 16% 80%;
+  --color-ring: 199 90% 56%;
+  --color-success: 142 60% 42%;
+  --color-warning: 28 90% 55%;
+  /* Pastel job card colors identical to LuckyJob */
+  --color-card-peach: 22 100% 91%;
+  --color-card-mint: 152 44% 87%;
+  --color-card-lavender: 262 56% 89%;
+  --color-card-sky: 202 80% 88%;
+  --color-card-pink: 344 70% 90%;
+  --color-card-cream: 45 80% 91%;
+  /* Navbar dark */
+  --color-navbar: 220 18% 10%;
+  --font-sans: "Inter", "DM Sans", sans-serif;
+  --font-serif: "Inter", sans-serif;
+}
+
+@layer base {
+  html { scroll-behavior: smooth; }
+
+  html, body, #root, #app {
+    min-height: 100%;
+    background-color: hsl(var(--color-background));
+    color: hsl(var(--color-foreground));
+    font-family: var(--font-sans);
+  }
+
+  * { @apply border-border; }
+
+  body { @apply bg-background text-foreground antialiased; font-family: var(--font-sans); }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-sans);
+    @apply text-foreground font-bold;
+  }
+
+  p, span, div, li, label, small { @apply text-foreground; }
+  a { @apply text-foreground; }
+
+  button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible {
+    outline: 3px solid hsl(var(--color-ring));
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .section-shell { @apply px-6 py-20 md:px-10 md:py-28; }
+  .section-title { font-family: var(--font-sans); @apply text-3xl font-bold text-foreground md:text-4xl; }
+  .section-copy { @apply text-base leading-7 text-muted-foreground md:text-lg; }
+
+  /* LuckyJob-style pill tag */
+  .job-tag {
+    @apply inline-flex items-center rounded-full border border-border bg-white px-3 py-1 text-xs font-medium text-foreground;
+  }
+
+  /* LuckyJob dark button */
+  .btn-dark {
+    @apply rounded-full bg-foreground px-5 py-2.5 text-sm font-semibold text-white transition-all duration-200 hover:opacity-80;
+  }
+
+  /* LuckyJob sky blue button */
+  .btn-sky {
+    @apply rounded-full bg-secondary px-5 py-2.5 text-sm font-semibold text-white transition-all duration-200 hover:opacity-85;
+  }
+
+  /* Card pastel backgrounds */
+  .card-peach  { background-color: hsl(var(--color-card-peach)); }
+  .card-mint   { background-color: hsl(var(--color-card-mint)); }
+  .card-lavender { background-color: hsl(var(--color-card-lavender)); }
+  .card-sky    { background-color: hsl(var(--color-card-sky)); }
+  .card-pink   { background-color: hsl(var(--color-card-pink)); }
+  .card-cream  { background-color: hsl(var(--color-card-cream)); }
+
+  .interactive-card { @apply transition duration-300 ease-in-out hover:scale-[1.02] hover:shadow-lg; }
+}

@@ -1,7 +1,106 @@
-import React from 'react';
+import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
+import { Briefcase, Users, PlusCircle, ClipboardList, TrendingUp } from "lucide-react";
+import { useQuery } from "@animaapp/playground-react-sdk";
+import { SmartNavbar } from "../../components/SmartNavbar";
+import { useAuthStore } from "../../store/authStore";
 
-const HRDashboardPage: React.FC = () => {
-  return <div>HR Dashboard Page</div>;
-};
+export function HRDashboardPage() {
+  const navigate = useNavigate();
+  const { user } = useAuthStore();
+  const { data: jobs, isPending: loadingJobs } = useQuery("JobPosting", { orderBy: { createdAt: "desc" }, limit: 5 });
+  const { data: apps, isPending: loadingApps } = useQuery("JobApplication", { orderBy: { createdAt: "desc" }, limit: 5 });
 
-export default HRDashboardPage;
+  const stats = [
+    { icon: <Briefcase size={20} />, label: "Active Jobs", value: jobs?.length || 0, color: "card-peach" },
+    { icon: <Users size={20} />, label: "Total Applicants", value: apps?.length || 0, color: "card-mint" },
+    { icon: <ClipboardList size={20} />, label: "Shortlisted", value: apps?.filter((a) => a.status === "Shortlisted").length || 0, color: "card-lavender" },
+    { icon: <TrendingUp size={20} />, label: "Hired", value: apps?.filter((a) => a.status === "Hired").length || 0, color: "card-sky" },
+  ];
+
+  return (
+    <div className="min-h-screen bg-background">
+      <SmartNavbar />
+      <div className="mx-auto max-w-7xl px-6 py-10 md:px-10">
+        {/* Welcome */}
+        <motion.div className="mb-8 rounded-2xl bg-white px-8 py-6 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+          initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+          <div>
+            <h1 className="text-xl font-bold text-foreground">HR Dashboard — {user?.university || "Your University"} 🎓</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">Manage your job postings and review applications</p>
+          </div>
+          <button type="button" onClick={() => navigate("/hr/post-job")} className="flex items-center gap-2 rounded-full bg-foreground px-5 py-2.5 text-sm font-semibold text-white hover:opacity-80 transition">
+            <PlusCircle size={15} /> Post New Job
+          </button>
+        </motion.div>
+
+        {/* Stats grid */}
+        <div className="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {stats.map((s, i) => (
+            <motion.div key={s.label} className={`${s.color} flex items-center gap-4 rounded-2xl p-5`}
+              initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}>
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/60 text-foreground">{s.icon}</div>
+              <div>
+                <p className="text-2xl font-bold text-foreground">{s.value}</p>
+                <p className="text-xs text-foreground/60">{s.label}</p>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Recent Jobs */}
+          <div className="rounded-2xl bg-white p-6 shadow-sm">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="font-bold text-foreground">Recent Job Postings</h2>
+              <button type="button" onClick={() => navigate("/hr/jobs")} className="text-xs font-semibold text-secondary hover:underline">View all</button>
+            </div>
+            {loadingJobs ? <div className="h-40 rounded-xl bg-muted animate-pulse" /> : (
+              <div className="space-y-3">
+                {(jobs && jobs.length > 0 ? jobs : []).map((j) => (
+                  <div key={j.id} className="flex items-center justify-between rounded-xl border border-border px-4 py-3">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">{j.title}</p>
+                      <p className="text-xs text-muted-foreground">{j.location} · {j.category}</p>
+                    </div>
+                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${j.isVerified ? "bg-emerald-100 text-emerald-700" : "bg-muted text-muted-foreground"}`}>
+                      {j.isVerified ? "Verified" : "Pending"}
+                    </span>
+                  </div>
+                ))}
+                {(!jobs || jobs.length === 0) && <p className="text-sm text-muted-foreground py-4 text-center">No jobs posted yet.</p>}
+              </div>
+            )}
+          </div>
+
+          {/* Recent Applications */}
+          <div className="rounded-2xl bg-white p-6 shadow-sm">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="font-bold text-foreground">Recent Applications</h2>
+              <button type="button" onClick={() => navigate("/hr/applications")} className="text-xs font-semibold text-secondary hover:underline">View all</button>
+            </div>
+            {loadingApps ? <div className="h-40 rounded-xl bg-muted animate-pulse" /> : (
+              <div className="space-y-3">
+                {(apps && apps.length > 0 ? apps : []).map((a) => (
+                  <div key={a.id} className="flex items-center justify-between rounded-xl border border-border px-4 py-3">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">{a.candidateName}</p>
+                      <p className="text-xs text-muted-foreground">{a.candidatePhone}</p>
+                    </div>
+                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                      a.status === "Hired" ? "bg-purple-100 text-purple-700" :
+                      a.status === "Shortlisted" ? "bg-emerald-100 text-emerald-700" :
+                      a.status === "Rejected" ? "bg-red-100 text-red-600" :
+                      "bg-amber-100 text-amber-700"
+                    }`}>{a.status}</span>
+                  </div>
+                ))}
+                {(!apps || apps.length === 0) && <p className="text-sm text-muted-foreground py-4 text-center">No applications yet.</p>}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -1,9 +1,26 @@
-import React from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from "react-router-dom";
+import { useAuthStore, UserRole } from "../store/authStore";
 
-const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const isAuthenticated = true; // Placeholder logic
-  return isAuthenticated ? <>{children}</> : <Navigate to="/login" />;
-};
+interface Props {
+  children: React.ReactNode;
+  requiredRole?: UserRole | UserRole[];
+}
 
-export default ProtectedRoute;
+export function ProtectedRoute({ children, requiredRole }: Props) {
+  const { token, role } = useAuthStore();
+  const location = useLocation();
+
+  if (!token) {
+    return <Navigate to={`/login?returnUrl=${encodeURIComponent(location.pathname)}`} replace />;
+  }
+
+  if (requiredRole) {
+    const allowed = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
+    if (!role || !allowed.includes(role)) {
+      const fallback = role === "hr" ? "/hr/dashboard" : role === "admin" ? "/admin" : "/dashboard";
+      return <Navigate to={fallback} replace />;
+    }
+  }
+
+  return <>{children}</>;
+}
