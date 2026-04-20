@@ -71,15 +71,40 @@ export function SignupPage() {
   const handleSignup = async () => {
     setLoading(true);
     setError("");
-    await new Promise((r) => setTimeout(r, 900));
+    
+    try {
+      const response = await fetch("http://localhost:5000/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: email,
+          password: password,
+          name: name,
+          role: "CANDIDATE", // They are signing up for jobs
+          university: state + " " + city, // storing location info in university temporarily for simplicity or keeping it null. Let's send it as university metadata if needed. Wait, we don't have location on user schema. We can pass university: "Not provided".
+        }),
+      });
 
-    const fakeToken = btoa(`candidate:${Date.now()}`);
-    const user: AuthUser = { id: `u_${Date.now()}`, name, email, roleType: selectedRole };
-    document.cookie = `univhire_token=${fakeToken}; path=/`;
-    document.cookie = `univhire_role=candidate; path=/`;
-    setAuth(fakeToken, "candidate", user);
-    navigate("/dashboard", { replace: true });
-    setLoading(false);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Signup failed");
+      }
+
+      const { token, user } = data;
+      const role = user.role.toLowerCase() as any;
+
+      document.cookie = `univhire_token=${token}; path=/`;
+      document.cookie = `univhire_role=${role}; path=/`;
+      // For type matching we use the roleType as whatever they selected internally
+      setAuth(token, role, { ...user, roleType: selectedRole });
+
+      navigate("/dashboard", { replace: true });
+    } catch (err: any) {
+      setError(err.message || "An error occurred during signup.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Bookmark, MapPin, Search, SlidersHorizontal, Bell, Settings, LogOut } from "lucide-react";
@@ -32,13 +32,31 @@ export function DashboardPage() {
   const [activeFilter, setActiveFilter] = useState("");
   const [search, setSearch] = useState("");
 
-  const { data: jobs, isPending } = useQuery("JobPosting", {
-    where: { isVerified: true },
-    orderBy: { createdAt: "desc" },
-    limit: 12,
-  });
+  const [fetchedJobs, setFetchedJobs] = useState<any[]>([]);
+  const [isPending, setIsPending] = useState(true);
 
-  const allJobs = (!isPending && jobs && jobs.length > 0) ? jobs : FALLBACK_JOBS;
+  useEffect(() => {
+    fetch("http://localhost:5000/api/jobs")
+      .then((res) => res.json())
+      .then((data) => {
+        setFetchedJobs(data);
+        setIsPending(false);
+      })
+      .catch((err) => {
+        console.error("Failed to fetch jobs:", err);
+        setIsPending(false);
+      });
+  }, []);
+
+  const allJobs = (!isPending && fetchedJobs.length > 0) ? fetchedJobs.map(j => ({
+    id: j.id, 
+    title: j.title, 
+    universityName: j.hr?.name || "Unknown University", 
+    category: j.jobType, 
+    location: j.location, 
+    description: j.description, 
+    isVerified: true
+  })) : FALLBACK_JOBS;
 
   const filtered = allJobs.filter((j) => {
     const matchCat = !activeFilter || j.category === activeFilter;

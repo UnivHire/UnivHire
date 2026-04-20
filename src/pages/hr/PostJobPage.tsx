@@ -10,8 +10,9 @@ const CATEGORIES = ["Faculty","Trainer","Driver","Security","Peon","Admin Staff"
 
 export function PostJobPage() {
   const navigate = useNavigate();
-  const { user } = useAuthStore();
-  const { create, isPending, error } = useMutation("JobPosting");
+  const { user, token } = useAuthStore();
+  const [isPending, setIsPending] = useState(false);
+  const [errorStr, setErrorStr] = useState("");
   const [success, setSuccess] = useState(false);
 
   const [form, setForm] = useState({
@@ -27,8 +28,35 @@ export function PostJobPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await create(form);
-    setSuccess(true);
+    setIsPending(true);
+    setErrorStr("");
+    
+    try {
+      const response = await fetch("http://localhost:5000/api/jobs", {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}` 
+        },
+        body: JSON.stringify({
+          title: form.title,
+          description: form.description,
+          location: form.location,
+          jobType: form.category
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to post job");
+      }
+
+      setSuccess(true);
+    } catch (err: any) {
+      setErrorStr(err.message || "An error occurred");
+    } finally {
+      setIsPending(false);
+    }
   };
 
   return (
@@ -71,7 +99,7 @@ export function PostJobPage() {
               <PField label="Job description" required>
                 <textarea value={form.description} onChange={(e) => set("description", e.target.value)} required rows={5} placeholder="Describe the role, requirements, responsibilities…" className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground outline-none focus:border-foreground/40 transition resize-none" />
               </PField>
-              {error && <p className="text-xs text-red-500">Error: {error.message}</p>}
+              {errorStr && <p className="text-xs text-red-500">Error: {errorStr}</p>}
               <button type="submit" disabled={isPending} className="w-full rounded-full bg-foreground py-3.5 text-sm font-bold text-white hover:opacity-80 disabled:opacity-60 transition">
                 {isPending ? "Posting…" : "Submit Job Posting →"}
               </button>
