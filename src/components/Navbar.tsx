@@ -83,9 +83,9 @@ export function Navbar() {
 
           {/* Right side */}
           <div className="hidden lg:flex items-center gap-3">
-            <div className="flex items-center gap-1.5 rounded-full border border-white/20 px-3 py-1.5 text-sm text-white/70">
-              <MapPin size={13} />
-              <span>India</span>
+            <div className="flex items-center gap-1.5 rounded-full border border-white/20 px-3 py-1.5 text-sm text-white">
+              <MapPin size={15} className="text-white" />
+              <span className="ml-1 text-white">India</span>
             </div>
             <button
               type="button"
@@ -127,7 +127,7 @@ export function Navbar() {
       {/* Filter bar */}
       <div className="bg-[#111111] border-t border-white/10 px-6 md:px-10 hidden lg:block">
         <div className="mx-auto flex h-14 max-w-7xl items-center gap-4">
-          <FilterPill icon="🔍" label="Role type" />
+          <FilterPill icon="🔍" label="Role type"/>
           <FilterPill icon="📍" label="Location" />
           <FilterPill icon="💼" label="Experience" />
           <FilterPill icon="💰" label="Salary range" />
@@ -192,11 +192,11 @@ function FilterPill({ icon, label }: { icon: string; label: string }) {
   return (
     <button
       type="button"
-      className="flex items-center gap-2 rounded-full border border-white/15 bg-white/8 px-4 py-1.5 text-sm text-white/70 transition hover:border-white/30 hover:text-white"
+      className="flex items-center gap-2 rounded-full border border-white/15 bg-white/8 px-4 py-1.5 text-sm text-white transition hover:border-white/30"
     >
-      <span>{icon}</span>
-      <span>{label}</span>
-      <span className="ml-1 text-white/40">▾</span>
+      <span className="text-white">{icon}</span>
+      <span className="text-white">{label}</span>
+      <span className="ml-1 text-white">▾</span>
     </button>
   );
 }

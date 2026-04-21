@@ -29,6 +29,19 @@ const HR_NAV = [
   { label: "Applications", href: "/hr/applications" },
 ];
 
+const ROLE_OPTIONS = ["Role type", "Faculty", "Operations", "Security", "Driver"];
+const LOCATION_OPTIONS = ["Location", "Delhi", "Mumbai", "Pune", "Bangalore"];
+const EXPERIENCE_OPTIONS = ["Experience", "Fresher", "1-3 years", "3-5 years", "5+ years"];
+const SALARY_OPTIONS = [
+  { label: "₹20k-₹2L/mo", min: 20, max: 200 },
+  { label: "₹20k-₹80k/mo", min: 20, max: 80 },
+  { label: "₹40k-₹1.2L/mo", min: 40, max: 120 },
+  { label: "₹80k-₹2L/mo", min: 80, max: 200 },
+];
+
+const SALARY_MIN_K = 20;
+const SALARY_MAX_K = 200;
+
 function getInitials(name: string) {
   return name
     .split(" ")
@@ -47,7 +60,14 @@ export function SmartNavbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [activeHash, setActiveHash] = useState("#home");
+  const [roleIndex, setRoleIndex] = useState(0);
+  const [locationIndex, setLocationIndex] = useState(0);
+  const [experienceIndex, setExperienceIndex] = useState(0);
+  const [salaryMinK, setSalaryMinK] = useState(20);
+  const [salaryMaxK, setSalaryMaxK] = useState(120);
+  const [openFilter, setOpenFilter] = useState<"role" | "location" | "experience" | "salary" | null>(null);
   const avatarRef = useRef<HTMLDivElement>(null);
+  const filterBarRef = useRef<HTMLDivElement>(null);
 
   const isLanding = location.pathname === "/";
 
@@ -72,6 +92,16 @@ export function SmartNavbar() {
     const handler = (e: MouseEvent) => {
       if (avatarRef.current && !avatarRef.current.contains(e.target as Node)) {
         setAvatarOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (filterBarRef.current && !filterBarRef.current.contains(e.target as Node)) {
+        setOpenFilter(null);
       }
     };
     document.addEventListener("mousedown", handler);
@@ -107,6 +137,17 @@ export function SmartNavbar() {
     if (href.startsWith("#")) return activeHash === href;
     return location.pathname === href || location.pathname.startsWith(href + "/");
   };
+
+  const formatSalary = (k: number) => {
+    if (k >= 100) {
+      const lpa = Number((k / 100).toFixed(1));
+      return `₹${lpa % 1 === 0 ? lpa.toFixed(0) : lpa}L`;
+    }
+    return `₹${k}k`;
+  };
+
+  const salaryProgressStart = ((salaryMinK - SALARY_MIN_K) / (SALARY_MAX_K - SALARY_MIN_K)) * 100;
+  const salaryProgressWidth = ((salaryMaxK - salaryMinK) / (SALARY_MAX_K - SALARY_MIN_K)) * 100;
 
   return (
     <motion.header
@@ -155,9 +196,9 @@ export function SmartNavbar() {
 
           {/* Right side */}
           <div className="hidden lg:flex items-center gap-3">
-            <div className="flex items-center gap-1.5 rounded-full border border-white/20 px-3 py-1.5 text-sm text-white/70">
-              <MapPin size={13} />
-              <span>India</span>
+            <div className="flex items-center gap-1.5 rounded-full border border-white/20 px-3 py-1.5 text-sm text-white">
+              <MapPin size={13} className="text-white" />
+              <span className="text-white">India</span>
             </div>
 
             {isLoggedIn ? (
@@ -258,18 +299,89 @@ export function SmartNavbar() {
       {/* ── Filter bar (desktop only, landing only) ─── */}
       {isLanding && (
         <div className="bg-[#111111] border-t border-white/10 px-6 md:px-10 hidden lg:block">
-          <div className="mx-auto flex h-14 max-w-7xl items-center gap-4">
-            <FilterPill icon="🔍" label="Role type" />
-            <FilterPill icon="📍" label="Location" />
-            <FilterPill icon="💼" label="Experience" />
-            <FilterPill icon="💰" label="Salary range" />
+          <div ref={filterBarRef} className="mx-auto flex h-14 max-w-7xl items-center gap-4">
+            <FilterPill
+              icon="🔍"
+              value={ROLE_OPTIONS[roleIndex]}
+              isOpen={openFilter === "role"}
+              onToggle={() => setOpenFilter((p) => (p === "role" ? null : "role"))}
+              options={ROLE_OPTIONS}
+              onSelect={(index) => {
+                setRoleIndex(index);
+                setOpenFilter(null);
+              }}
+            />
+            <FilterPill
+              icon="📍"
+              value={LOCATION_OPTIONS[locationIndex]}
+              isOpen={openFilter === "location"}
+              onToggle={() => setOpenFilter((p) => (p === "location" ? null : "location"))}
+              options={LOCATION_OPTIONS}
+              onSelect={(index) => {
+                setLocationIndex(index);
+                setOpenFilter(null);
+              }}
+            />
+            <FilterPill
+              icon="💼"
+              value={EXPERIENCE_OPTIONS[experienceIndex]}
+              isOpen={openFilter === "experience"}
+              onToggle={() => setOpenFilter((p) => (p === "experience" ? null : "experience"))}
+              options={EXPERIENCE_OPTIONS}
+              onSelect={(index) => {
+                setExperienceIndex(index);
+                setOpenFilter(null);
+              }}
+            />
+            <FilterPill
+              icon="💰"
+              value={`${formatSalary(salaryMinK)}-${formatSalary(salaryMaxK)}/mo`}
+              isOpen={openFilter === "salary"}
+              onToggle={() => setOpenFilter((p) => (p === "salary" ? null : "salary"))}
+              options={SALARY_OPTIONS.map((s) => s.label)}
+              onSelect={(index) => {
+                setSalaryMinK(SALARY_OPTIONS[index].min);
+                setSalaryMaxK(SALARY_OPTIONS[index].max);
+                setOpenFilter(null);
+              }}
+            />
             <div className="ml-auto flex items-center gap-3 text-sm text-white/60">
               <span className="text-white/40">Salary range</span>
-              <span className="font-semibold text-white">₹20k – ₹2L/mo</span>
-              <div className="relative flex w-28 items-center h-1 bg-white/20 rounded-full">
-                <div className="absolute left-0 h-1 w-2/3 rounded-full bg-secondary" />
-                <span className="absolute left-[42%] h-3 w-3 rounded-full bg-secondary border-2 border-white cursor-pointer" />
-                <span className="absolute left-[62%] h-3 w-3 rounded-full bg-white cursor-pointer" />
+              <span className="font-semibold text-white">{formatSalary(salaryMinK)}–{formatSalary(salaryMaxK)}/mo</span>
+              <div className="relative w-36">
+                <div className="h-1 w-full rounded-full bg-white/20" />
+                <div
+                  className="absolute top-0 h-1 rounded-full bg-secondary"
+                  style={{ left: `${salaryProgressStart}%`, width: `${salaryProgressWidth}%` }}
+                />
+                <input
+                  type="range"
+                  min={SALARY_MIN_K}
+                  max={SALARY_MAX_K}
+                  step={5}
+                  value={salaryMinK}
+                  onChange={(e) => {
+                    const next = Number(e.target.value);
+                    setSalaryMinK(Math.min(next, salaryMaxK - 5));
+                  }}
+                  className="absolute left-0 top-[-6px] h-4 w-full cursor-pointer appearance-none bg-transparent"
+                  aria-label="Minimum salary"
+                />
+                <input
+                  type="range"
+                  min={SALARY_MIN_K}
+                  max={SALARY_MAX_K}
+                  step={5}
+                  value={salaryMaxK}
+                  onChange={(e) => {
+                    const next = Number(e.target.value);
+                    setSalaryMaxK(Math.max(next, salaryMinK + 5));
+                  }}
+                  className="absolute left-0 top-[-6px] h-4 w-full cursor-pointer appearance-none bg-transparent"
+                  aria-label="Maximum salary"
+                />
+                <span className="pointer-events-none absolute top-[-4px] h-3 w-3 rounded-full border-2 border-white bg-secondary" style={{ left: `calc(${salaryProgressStart}% - 6px)` }} />
+                <span className="pointer-events-none absolute top-[-4px] h-3 w-3 rounded-full bg-white" style={{ left: `calc(${salaryProgressStart + salaryProgressWidth}% - 6px)` }} />
               </div>
             </div>
           </div>
@@ -331,13 +443,55 @@ export function SmartNavbar() {
   );
 }
 
-function FilterPill({ icon, label }: { icon: string; label: string }) {
+function FilterPill({
+  icon,
+  value,
+  isOpen,
+  onToggle,
+  options,
+  onSelect,
+}: {
+  icon: string;
+  value: string;
+  isOpen: boolean;
+  onToggle: () => void;
+  options: string[];
+  onSelect: (index: number) => void;
+}) {
   return (
-    <button type="button" className="flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-sm text-white/70 transition hover:border-white/30 hover:text-white">
-      <span>{icon}</span>
-      <span>{label}</span>
-      <span className="ml-1 text-white/40">▾</span>
-    </button>
+    <div className="relative">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-sm text-white transition hover:border-white/30"
+      >
+        <span className="text-white">{icon}</span>
+        <span className="text-white">{value}</span>
+        <span className="ml-1 text-white">▾</span>
+      </button>
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            className="absolute left-0 top-11 z-50 min-w-full rounded-xl border border-white/15 bg-[#161616] p-1.5 shadow-xl"
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.15 }}
+          >
+            {options.map((option, index) => (
+              <button
+                key={option}
+                type="button"
+                onClick={() => onSelect(index)}
+                className="block w-full rounded-lg px-3 py-2 text-left text-sm text-white transition hover:bg-white/10"
+              >
+                {option}
+              </button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 
@@ -346,7 +500,7 @@ function DropdownItem({ icon, label, onClick, danger }: { icon: React.ReactNode;
     <button
       type="button"
       onClick={onClick}
-      className={`flex w-full items-center gap-3 px-4 py-2.5 text-sm transition hover:bg-muted ${danger ? "text-red-500 hover:text-red-600" : "text-foreground"}`}
+      className={`flex w-full items-center gap-3 px-4 py-2.5 text-white text-sm transition hover:bg-muted ${danger ? "text-red-500 hover:text-red-600" : "text-foreground"}`}
     >
       {icon}
       {label}
