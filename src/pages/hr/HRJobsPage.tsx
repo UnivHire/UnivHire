@@ -1,13 +1,48 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, PlusCircle, MapPin, Briefcase } from "lucide-react";
-import { useQuery, useMutation } from "@animaapp/playground-react-sdk";
 import { SmartNavbar } from "../../components/SmartNavbar";
+import { useAuthStore } from "../../store/authStore";
 
 export function HRJobsPage() {
   const navigate = useNavigate();
-  const { data: jobs, isPending } = useQuery("JobPosting", { orderBy: { createdAt: "desc" } });
-  const { remove } = useMutation("JobPosting");
+  const { user, token } = useAuthStore();
+  const [jobs, setJobs] = useState<any[]>([]);
+  const [isPending, setIsPending] = useState(true);
+
+  const loadJobs = async () => {
+    try {
+      const response = await fetch("http://localhost:5000/api/jobs");
+      const data = await response.json();
+      if (!response.ok) throw new Error("Failed to fetch jobs");
+      const hrJobs = (data || []).filter((j: any) => j?.hrId === user?.id);
+      setJobs(hrJobs);
+    } catch {
+      setJobs([]);
+    } finally {
+      setIsPending(false);
+    }
+  };
+
+  useEffect(() => {
+    if (token && user?.id) {
+      loadJobs();
+    } else {
+      setJobs([]);
+      setIsPending(false);
+    }
+  }, [token, user?.id]);
+
+  const removeJob = async (jobId: string) => {
+    if (!token) return;
+    const response = await fetch(`http://localhost:5000/api/jobs/${jobId}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) return;
+    setJobs((prev) => prev.filter((j) => j.id !== jobId));
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -42,13 +77,13 @@ export function HRJobsPage() {
                   <p className="font-semibold text-foreground truncate">{j.title}</p>
                   <div className="flex gap-3 mt-1 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1"><MapPin size={11} />{j.location}</span>
-                    <span className="flex items-center gap-1"><Briefcase size={11} />{j.category}</span>
+                    <span className="flex items-center gap-1"><Briefcase size={11} />{j.jobType}</span>
                   </div>
                 </div>
-                <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${j.isVerified ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
-                  {j.isVerified ? "Verified" : "Pending"}
+                <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${j.status === "OPEN" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                  {j.status === "OPEN" ? "Open" : "Closed"}
                 </span>
-                <button type="button" onClick={() => { if (window.confirm("Delete this job posting?")) remove(j.id); }}
+                <button type="button" onClick={() => { if (window.confirm("Delete this job posting?")) removeJob(j.id); }}
                   className="shrink-0 rounded-full border border-red-200 px-3 py-1.5 text-xs font-medium text-red-500 hover:bg-red-50 transition">
                   Delete
                 </button>

@@ -11,6 +11,7 @@ import { HRDashboardPage } from "./pages/hr/HRDashboardPage";
 import { PostJobPage } from "./pages/hr/PostJobPage";
 import { HRJobsPage } from "./pages/hr/HRJobsPage";
 import { HRApplicationsPage } from "./pages/hr/HRApplicationsPage";
+import { HRApplicationDetailPage } from "./pages/hr/HRApplicationDetailPage";
 import { AdminPage } from "./pages/admin/AdminPage";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
@@ -35,6 +36,7 @@ function App() {
         <Route path="/hr/post-job" element={<ProtectedRoute requiredRole={["hr", "admin"]}><PostJobPage /></ProtectedRoute>} />
         <Route path="/hr/jobs" element={<ProtectedRoute requiredRole={["hr", "admin"]}><HRJobsPage /></ProtectedRoute>} />
         <Route path="/hr/applications" element={<ProtectedRoute requiredRole={["hr", "admin"]}><HRApplicationsPage /></ProtectedRoute>} />
+        <Route path="/hr/applications/:id" element={<ProtectedRoute requiredRole={["hr", "admin"]}><HRApplicationDetailPage /></ProtectedRoute>} />
 
         {/* ── Admin (protected) ───────────────────── */}
         <Route path="/admin" element={<ProtectedRoute requiredRole="admin"><AdminPage /></ProtectedRoute>} />

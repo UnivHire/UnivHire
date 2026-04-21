@@ -93,7 +93,7 @@ export function Hero() {
           <div className="flex flex-col gap-6 border-b border-border px-8 py-8 lg:flex-row lg:items-start lg:gap-10">
             {/* Sidebar promo card */}
             <motion.div
-              className="relative flex-shrink-0 rounded-2xl bg-[hsl(220,18%,12%)] p-7 text-white w-full lg:w-64 overflow-hidden"
+              className="relative order-2 flex-shrink-0 overflow-hidden rounded-2xl bg-[hsl(220,18%,12%)] p-8 text-white w-full lg:ml-auto lg:w-[30rem] lg:p-9"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.5 }}
@@ -102,20 +102,20 @@ export function Hero() {
               <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full border border-white/10" />
               <div className="absolute -right-4 -bottom-10 h-40 w-40 rounded-full border border-white/10" />
               <div className="absolute right-2 bottom-2 h-16 w-16 rounded-full border border-white/10" />
-              <p className="relative mb-6 text-xl font-bold leading-snug">
+              <p className="relative mb-7 text-2xl font-bold leading-snug text-white lg:text-[2rem]">
                 Get Your best<br />profession<br />with <span className="text-secondary">UnivHire</span>
               </p>
               <button
                 type="button"
                 onClick={() => document.querySelector("#for-candidates")?.scrollIntoView({ behavior: "smooth" })}
-                className="relative rounded-full bg-secondary px-6 py-2.5 text-sm font-semibold text-white transition hover:opacity-85"
+                className="relative rounded-full bg-secondary px-8 py-3 text-base font-semibold text-white transition hover:opacity-85"
               >
                 Find Jobs
               </button>
             </motion.div>
 
             {/* Main headline + search area */}
-            <div className="flex-1">
+            <div className="order-1 flex-1">
               <motion.div
                 className="mb-3 inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5"
                 initial={{ opacity: 0, y: 8 }}
@@ -134,7 +134,7 @@ export function Hero() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.45, delay: 0.1 }}
               >
-                India&#39;s First Centralized<br />
+                India's First Centralized<br />
                 <span className="text-secondary">University Hiring</span> Platform
               </motion.h1>
 

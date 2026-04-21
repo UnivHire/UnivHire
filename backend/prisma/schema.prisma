@@ -43,6 +43,9 @@ model Application {
   job         Job      @relation(fields: [jobId], references: [id])
   candidateId String
   candidate   User     @relation(fields: [candidateId], references: [id])
+  candidatePhone String?
+  candidateAddress String?
+  currentLocation String?
   resumeUrl   String?
   status      String   @default("PENDING") // 'PENDING', 'REVIEWED', 'REJECTED', 'ACCEPTED'
   appliedAt   DateTime @default(now())
