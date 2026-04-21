@@ -38,29 +38,42 @@ export function LoginPage() {
     setLoading(true);
     setError("");
 
-    await new Promise((r) => setTimeout(r, 700));
+    try {
+      const response = await fetch("http://localhost:5000/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
 
-    const demo = DEMO_ACCOUNTS[email.toLowerCase()];
-    if (demo && password.length >= 4) {
-      const fakeToken = btoa(`${demo.role}:${Date.now()}`);
-      document.cookie = `univhire_token=${fakeToken}; path=/`;
-      document.cookie = `univhire_role=${demo.role}; path=/`;
-      setAuth(fakeToken, demo.role, demo.user);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Login failed");
+      }
+
+      // Successful login
+      const { token, user } = data;
+      // Normalizing the role format (uppercase from DB -> lowercase for frontend if needed)
+      const role = user.role.toLowerCase() as UserRole;
+      
+      document.cookie = `univhire_token=${token}; path=/`;
+      document.cookie = `univhire_role=${role}; path=/`;
+      setAuth(token, role, { ...user, roleType: user.role });
 
       const dest = returnUrl
         ? returnUrl
-        : demo.role === "candidate"
+        : role === "candidate"
         ? "/dashboard"
-        : demo.role === "hr"
+        : role === "hr"
         ? "/hr/dashboard"
         : "/admin";
 
       navigate(dest, { replace: true });
-    } else {
-      setError("Invalid credentials. Try candidate@demo.com / hr@demo.com (any password ≥ 4 chars).");
+    } catch (err: any) {
+      setError(err.message || "Something went wrong.");
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   return (
