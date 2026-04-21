@@ -1,21 +1,76 @@
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Briefcase, Users, PlusCircle, ClipboardList, TrendingUp } from "lucide-react";
-import { useQuery } from "@animaapp/playground-react-sdk";
 import { SmartNavbar } from "../../components/SmartNavbar";
 import { useAuthStore } from "../../store/authStore";
 
 export function HRDashboardPage() {
   const navigate = useNavigate();
-  const { user } = useAuthStore();
-  const { data: jobs, isPending: loadingJobs } = useQuery("JobPosting", { orderBy: { createdAt: "desc" }, limit: 5 });
-  const { data: apps, isPending: loadingApps } = useQuery("JobApplication", { orderBy: { createdAt: "desc" }, limit: 5 });
+  const { user, token } = useAuthStore();
+  const [jobs, setJobs] = useState<any[]>([]);
+  const [applications, setApplications] = useState<any[]>([]);
+  const [loadingJobs, setLoadingJobs] = useState(true);
+  const [loadingApplications, setLoadingApplications] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const response = await fetch("http://localhost:5000/api/jobs");
+        const data = await response.json();
+        if (!response.ok) throw new Error("Failed to fetch jobs");
+
+        // Show only current HR's jobs on HR dashboard.
+        const hrJobs = (data || []).filter((j: any) => j?.hrId === user?.id);
+        setJobs(hrJobs);
+      } catch {
+        setJobs([]);
+      } finally {
+        setLoadingJobs(false);
+      }
+    };
+
+    if (token && user?.id) {
+      load();
+    } else {
+      setJobs([]);
+      setLoadingJobs(false);
+    }
+  }, [token, user?.id]);
+
+  useEffect(() => {
+    const loadApplications = async () => {
+      if (!token) {
+        setApplications([]);
+        setLoadingApplications(false);
+        return;
+      }
+
+      try {
+        const response = await fetch("http://localhost:5000/api/applications", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error("Failed to fetch applications");
+        setApplications(data || []);
+      } catch {
+        setApplications([]);
+      } finally {
+        setLoadingApplications(false);
+      }
+    };
+
+    loadApplications();
+  }, [token]);
+
+  const recentJobs = useMemo(() => jobs.slice(0, 5), [jobs]);
+  const recentApplications = useMemo(() => applications.slice(0, 5), [applications]);
 
   const stats = [
     { icon: <Briefcase size={20} />, label: "Active Jobs", value: jobs?.length || 0, color: "card-peach" },
-    { icon: <Users size={20} />, label: "Total Applicants", value: apps?.length || 0, color: "card-mint" },
-    { icon: <ClipboardList size={20} />, label: "Shortlisted", value: apps?.filter((a) => a.status === "Shortlisted").length || 0, color: "card-lavender" },
-    { icon: <TrendingUp size={20} />, label: "Hired", value: apps?.filter((a) => a.status === "Hired").length || 0, color: "card-sky" },
+    { icon: <Users size={20} />, label: "Total Applicants", value: applications?.length || 0, color: "card-mint" },
+    { icon: <ClipboardList size={20} />, label: "Shortlisted", value: applications?.filter((a) => String(a.status).toUpperCase() === "SHORTLISTED").length || 0, color: "card-lavender" },
+    { icon: <TrendingUp size={20} />, label: "Hired", value: applications?.filter((a) => String(a.status).toUpperCase() === "HIRED").length || 0, color: "card-sky" },
   ];
 
   return (
@@ -57,14 +112,14 @@ export function HRDashboardPage() {
             </div>
             {loadingJobs ? <div className="h-40 rounded-xl bg-muted animate-pulse" /> : (
               <div className="space-y-3">
-                {(jobs && jobs.length > 0 ? jobs : []).map((j) => (
+                {(recentJobs && recentJobs.length > 0 ? recentJobs : []).map((j) => (
                   <div key={j.id} className="flex items-center justify-between rounded-xl border border-border px-4 py-3">
                     <div>
                       <p className="text-sm font-semibold text-foreground">{j.title}</p>
-                      <p className="text-xs text-muted-foreground">{j.location} · {j.category}</p>
+                      <p className="text-xs text-muted-foreground">{j.location} · {j.jobType}</p>
                     </div>
-                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${j.isVerified ? "bg-emerald-100 text-emerald-700" : "bg-muted text-muted-foreground"}`}>
-                      {j.isVerified ? "Verified" : "Pending"}
+                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${j.status === "OPEN" ? "bg-emerald-100 text-emerald-700" : "bg-muted text-muted-foreground"}`}>
+                      {j.status === "OPEN" ? "Open" : "Closed"}
                     </span>
                   </div>
                 ))}
@@ -79,23 +134,20 @@ export function HRDashboardPage() {
               <h2 className="font-bold text-foreground">Recent Applications</h2>
               <button type="button" onClick={() => navigate("/hr/applications")} className="text-xs font-semibold text-secondary hover:underline">View all</button>
             </div>
-            {loadingApps ? <div className="h-40 rounded-xl bg-muted animate-pulse" /> : (
+            {loadingApplications ? <div className="h-40 rounded-xl bg-muted animate-pulse" /> : (
               <div className="space-y-3">
-                {(apps && apps.length > 0 ? apps : []).map((a) => (
+                {recentApplications.map((a) => (
                   <div key={a.id} className="flex items-center justify-between rounded-xl border border-border px-4 py-3">
                     <div>
-                      <p className="text-sm font-semibold text-foreground">{a.candidateName}</p>
-                      <p className="text-xs text-muted-foreground">{a.candidatePhone}</p>
+                      <p className="text-sm font-semibold text-foreground">{a.candidate?.name || "Candidate"}</p>
+                      <p className="text-xs text-muted-foreground">{a.job?.title || "Job"}</p>
                     </div>
-                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                      a.status === "Hired" ? "bg-purple-100 text-purple-700" :
-                      a.status === "Shortlisted" ? "bg-emerald-100 text-emerald-700" :
-                      a.status === "Rejected" ? "bg-red-100 text-red-600" :
-                      "bg-amber-100 text-amber-700"
-                    }`}>{a.status}</span>
+                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${String(a.status).toUpperCase() === "HIRED" ? "bg-purple-100 text-purple-700" : String(a.status).toUpperCase() === "SHORTLISTED" ? "bg-emerald-100 text-emerald-700" : String(a.status).toUpperCase() === "REJECTED" ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-700"}`}>
+                      {String(a.status).charAt(0).toUpperCase() + String(a.status).slice(1).toLowerCase()}
+                    </span>
                   </div>
                 ))}
-                {(!apps || apps.length === 0) && <p className="text-sm text-muted-foreground py-4 text-center">No applications yet.</p>}
+                {recentApplications.length === 0 && <p className="text-sm text-muted-foreground py-4 text-center">No applications yet.</p>}
               </div>
             )}
           </div>

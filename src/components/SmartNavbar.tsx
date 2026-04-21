@@ -500,7 +500,7 @@ function DropdownItem({ icon, label, onClick, danger }: { icon: React.ReactNode;
     <button
       type="button"
       onClick={onClick}
-      className={`flex w-full items-center gap-3 px-4 py-2.5 text-white text-sm transition hover:bg-muted ${danger ? "text-red-500 hover:text-red-600" : "text-foreground"}`}
+      className={`flex w-full items-center gap-3 px-4 py-2.5 text-sm transition hover:bg-muted ${danger ? "text-red-500 hover:text-red-600" : "text-foreground"}`}
     >
       {icon}
       {label}

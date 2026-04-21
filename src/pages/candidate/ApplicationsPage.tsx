@@ -1,19 +1,47 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Clock, CheckCircle2, XCircle, Trophy } from "lucide-react";
-import { useQuery } from "@animaapp/playground-react-sdk";
+import { ArrowLeft, Briefcase, Clock, CheckCircle2, MapPin, XCircle, Trophy } from "lucide-react";
 import { SmartNavbar } from "../../components/SmartNavbar";
+import { useAuthStore } from "../../store/authStore";
 
 const STATUS_STYLES: Record<string, { icon: React.ReactNode; color: string }> = {
-  Pending:     { icon: <Clock size={13} />,         color: "bg-amber-100 text-amber-700" },
-  Shortlisted: { icon: <CheckCircle2 size={13} />,  color: "bg-emerald-100 text-emerald-700" },
-  Rejected:    { icon: <XCircle size={13} />,       color: "bg-red-100 text-red-600" },
-  Hired:       { icon: <Trophy size={13} />,        color: "bg-purple-100 text-purple-700" },
+  PENDING: { icon: <Clock size={13} />, color: "bg-amber-100 text-amber-700" },
+  SHORTLISTED: { icon: <CheckCircle2 size={13} />, color: "bg-emerald-100 text-emerald-700" },
+  REJECTED: { icon: <XCircle size={13} />, color: "bg-red-100 text-red-600" },
+  HIRED: { icon: <Trophy size={13} />, color: "bg-purple-100 text-purple-700" },
 };
 
 export function ApplicationsPage() {
   const navigate = useNavigate();
-  const { data: applications, isPending } = useQuery("JobApplication", { orderBy: { createdAt: "desc" } });
+  const { token } = useAuthStore();
+  const [applications, setApplications] = useState<any[]>([]);
+  const [isPending, setIsPending] = useState(true);
+
+  useEffect(() => {
+    const loadApplications = async () => {
+      if (!token) {
+        setApplications([]);
+        setIsPending(false);
+        return;
+      }
+
+      try {
+        const response = await fetch("http://localhost:5000/api/applications", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Failed to fetch applications");
+        setApplications(data || []);
+      } catch {
+        setApplications([]);
+      } finally {
+        setIsPending(false);
+      }
+    };
+
+    loadApplications();
+  }, [token]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -44,16 +72,21 @@ export function ApplicationsPage() {
         {!isPending && applications && applications.length > 0 && (
           <div className="space-y-3">
             {applications.map((app, i) => {
-              const s = STATUS_STYLES[app.status] || STATUS_STYLES["Pending"];
+              const normalizedStatus = String(app.status || "PENDING").toUpperCase();
+              const s = STATUS_STYLES[normalizedStatus] || STATUS_STYLES["PENDING"];
               return (
                 <motion.div key={app.id} className="flex items-center justify-between rounded-2xl bg-white px-6 py-5 shadow-sm"
                   initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
                   <div>
-                    <p className="font-semibold text-foreground text-sm">{app.candidateName}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">Applied {new Date(app.createdAt).toLocaleDateString("en-IN")}</p>
+                    <p className="font-semibold text-foreground text-sm">{app.job?.title || "Job"}</p>
+                    <p className="mt-0.5 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1"><MapPin size={11} />{app.job?.location || "Location"}</span>
+                      <span className="flex items-center gap-1"><Briefcase size={11} />{app.job?.jobType || "Role"}</span>
+                      <span>Applied {new Date(app.appliedAt).toLocaleDateString("en-IN")}</span>
+                    </p>
                   </div>
                   <span className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${s.color}`}>
-                    {s.icon}{app.status}
+                    {s.icon}{normalizedStatus.charAt(0) + normalizedStatus.slice(1).toLowerCase()}
                   </span>
                 </motion.div>
               );
