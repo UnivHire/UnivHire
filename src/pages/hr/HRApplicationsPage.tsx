@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import { SmartNavbar } from "../../components/SmartNavbar";
@@ -15,9 +15,11 @@ const STATUS_COLOR: Record<string, string> = {
 
 export function HRApplicationsPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { token } = useAuthStore();
   const [apps, setApps] = useState<any[]>([]);
   const [isPending, setIsPending] = useState(true);
+  const selectedJobType = (searchParams.get("jobType") || "").trim().toLowerCase();
 
   const loadApplications = async () => {
     if (!token) {
@@ -32,7 +34,11 @@ export function HRApplicationsPage() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Failed to fetch applications");
-      setApps(data || []);
+      const list = data || [];
+      const filteredList = selectedJobType
+        ? list.filter((app: any) => String(app?.job?.jobType || "").toLowerCase() === selectedJobType)
+        : list;
+      setApps(filteredList);
     } catch {
       setApps([]);
     } finally {
@@ -42,7 +48,7 @@ export function HRApplicationsPage() {
 
   useEffect(() => {
     loadApplications();
-  }, [token]);
+  }, [token, selectedJobType]);
 
   const updateStatus = async (applicationId: string, status: string) => {
     if (!token) return;
@@ -73,6 +79,12 @@ export function HRApplicationsPage() {
           <h1 className="text-2xl font-bold text-foreground">All Applications</h1>
           <span className="rounded-full border border-border bg-white px-3 py-1 text-sm font-medium">{apps?.length || 0} total</span>
         </div>
+
+        {selectedJobType && (
+          <div className="mb-4 rounded-xl border border-border bg-white px-4 py-2.5 text-sm text-foreground shadow-sm">
+            Showing applications for role: <span className="font-semibold">{selectedJobType.charAt(0).toUpperCase() + selectedJobType.slice(1)}</span>
+          </div>
+        )}
 
         {isPending && <div className="space-y-3">{[1,2,3].map((i) => <div key={i} className="h-20 rounded-2xl bg-muted animate-pulse" />)}</div>}
 
