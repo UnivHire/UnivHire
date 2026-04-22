@@ -5,11 +5,15 @@ import { ArrowLeft, PlusCircle, MapPin, Briefcase } from "lucide-react";
 import { SmartNavbar } from "../../components/SmartNavbar";
 import { useAuthStore } from "../../store/authStore";
 
+const ROLE_FILTERS = ["All", "Trainer", "Driver", "Faculty", "Security", "Peon", "Operations", "Admin Staff", "Other"];
+
 export function HRJobsPage() {
   const navigate = useNavigate();
   const { user, token } = useAuthStore();
   const [jobs, setJobs] = useState<any[]>([]);
   const [isPending, setIsPending] = useState(true);
+  const [roleFilter, setRoleFilter] = useState("All");
+  const [sortBy, setSortBy] = useState("newest");
 
   const loadJobs = async () => {
     try {
@@ -44,6 +48,15 @@ export function HRJobsPage() {
     setJobs((prev) => prev.filter((j) => j.id !== jobId));
   };
 
+  const filteredAndSortedJobs = [...jobs]
+    .filter((job) => roleFilter === "All" || String(job.jobType || "").toLowerCase() === roleFilter.toLowerCase())
+    .sort((a, b) => {
+      if (sortBy === "oldest") return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      if (sortBy === "title-asc") return String(a.title || "").localeCompare(String(b.title || ""));
+      if (sortBy === "title-desc") return String(b.title || "").localeCompare(String(a.title || ""));
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+
   return (
     <div className="min-h-screen bg-background">
       <SmartNavbar />
@@ -54,11 +67,49 @@ export function HRJobsPage() {
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground">My Job Postings</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">{jobs?.length || 0} postings found</p>
+            <p className="text-sm text-muted-foreground mt-0.5">{filteredAndSortedJobs.length || 0} postings found</p>
           </div>
-          <button type="button" onClick={() => navigate("/hr/post-job")} className="flex items-center gap-2 rounded-full bg-foreground px-5 py-2.5 text-sm font-semibold text-white hover:opacity-80 transition">
-            <PlusCircle size={15} /> Post New Job
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => navigate(`/hr/applications${roleFilter !== "All" ? `?jobType=${encodeURIComponent(roleFilter)}` : ""}`)}
+              className="rounded-full border border-border px-5 py-2.5 text-sm font-semibold text-foreground hover:bg-background transition"
+            >
+              Manage Applications
+            </button>
+            <button type="button" onClick={() => navigate("/hr/post-job")} className="flex items-center gap-2 rounded-full bg-foreground px-5 py-2.5 text-sm font-semibold text-white hover:opacity-80 transition">
+              <PlusCircle size={15} /> Post New Job
+            </button>
+          </div>
+        </div>
+
+        <div className="mb-5 flex flex-wrap items-center gap-3 rounded-2xl bg-white p-4 shadow-sm">
+          <label className="flex items-center gap-2 text-sm text-foreground">
+            <span className="font-semibold">Application role:</span>
+            <select
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
+              className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-foreground/40"
+            >
+              {ROLE_FILTERS.map((role) => (
+                <option key={role} value={role}>{role}</option>
+              ))}
+            </select>
+          </label>
+
+          <label className="flex items-center gap-2 text-sm text-foreground">
+            <span className="font-semibold">Sort by:</span>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-foreground/40"
+            >
+              <option value="newest">Newest</option>
+              <option value="oldest">Oldest</option>
+              <option value="title-asc">Title A-Z</option>
+              <option value="title-desc">Title Z-A</option>
+            </select>
+          </label>
         </div>
 
         {isPending && <div className="space-y-3">{[1,2,3].map((i) => <div key={i} className="h-24 rounded-2xl bg-muted animate-pulse" />)}</div>}
@@ -70,7 +121,7 @@ export function HRJobsPage() {
         )}
         {!isPending && jobs && jobs.length > 0 && (
           <div className="space-y-3">
-            {jobs.map((j, i) => (
+            {filteredAndSortedJobs.map((j, i) => (
               <motion.div key={j.id} className="rounded-2xl bg-white px-6 py-5 shadow-sm flex items-center justify-between gap-4"
                 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
                 <div className="flex-1 min-w-0">
@@ -89,6 +140,11 @@ export function HRJobsPage() {
                 </button>
               </motion.div>
             ))}
+            {filteredAndSortedJobs.length === 0 && (
+              <div className="rounded-2xl bg-white p-8 text-center shadow-sm">
+                <p className="text-sm text-muted-foreground">No jobs found for selected role filter.</p>
+              </div>
+            )}
           </div>
         )}
       </div>

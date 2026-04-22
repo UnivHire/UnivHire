@@ -249,7 +249,8 @@ export function SmartNavbar() {
                         </div>
                         <div className="py-1.5">
                           <DropdownItem icon={<LayoutDashboard size={14} />} label="My Dashboard" onClick={() => { navigate(role === "hr" ? "/hr/dashboard" : "/dashboard"); setAvatarOpen(false); }} />
-                          <DropdownItem icon={<User size={14} />} label="Profile Settings" onClick={() => { navigate(role === "hr" ? "/hr/profile" : "/profile"); setAvatarOpen(false); }} />
+                          <DropdownItem icon={<User size={14} />} label="My Profile" onClick={() => { navigate(role === "hr" ? "/hr/profile" : "/profile"); setAvatarOpen(false); }} />
+                          <DropdownItem icon={<Settings size={14} />} label="Settings" onClick={() => { navigate(role === "hr" ? "/hr/settings" : "/settings"); setAvatarOpen(false); }} />
                           <DropdownItem icon={<FileText size={14} />} label="My Applications" onClick={() => { navigate(role === "hr" ? "/hr/applications" : "/applications"); setAvatarOpen(false); }} />
                           {role === "candidate" && (
                             <DropdownItem icon={<BookmarkIcon size={14} />} label="Saved Jobs" onClick={() => { navigate("/saved"); setAvatarOpen(false); }} />
