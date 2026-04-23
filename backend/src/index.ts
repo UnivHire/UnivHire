@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "./generated/prisma";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import multer from "multer";
@@ -137,11 +137,21 @@ app.get("/api/auth/me", authenticateToken, async (req: any, res: any) => {
   }
 });
 
+// DEBUG: Verify engine sees new columns
+app.get("/api/debug/jobs", async (_req: any, res: any) => {
+  try {
+    const rows: any[] = await prisma.$queryRaw`SELECT id, organizationName, workplaceType, seniorityLevel, jobFunction, industry, experienceYears, requiredSkills, applicationMode, applicationEmail, requireResume, externalApplyUrl FROM "Job" LIMIT 5`;
+    res.json({ engine: "raw", rows });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // 4. Jobs: Get all jobs
 app.get("/api/jobs", async (req: any, res: any) => {
   try {
     const jobs = await prisma.job.findMany({
-      include: { hr: { select: { name: true, email: true } } },
+      include: { hr: { select: { name: true, email: true, university: true } } },
       orderBy: { createdAt: 'desc' }
     });
     res.json(jobs);
@@ -156,7 +166,7 @@ app.get("/api/jobs/:id", async (req: any, res: any) => {
   try {
     const job = await prisma.job.findUnique({
       where: { id: req.params.id },
-      include: { hr: { select: { id: true, name: true, email: true } } },
+      include: { hr: { select: { id: true, name: true, email: true, university: true } } },
     });
 
     if (!job) {
@@ -176,20 +186,97 @@ app.post("/api/jobs", authenticateToken, async (req: any, res: any) => {
       return res.status(403).json({ error: "Forbidden. HR access required." });
     }
 
-    const { title, description, location, jobType } = req.body;
-    const job = await prisma.job.create({
-      data: {
-        title,
-        description,
-        location,
-        jobType,
-        hrId: req.user.id
-      }
+    const {
+      title, organizationName, universityName, description, location,
+      jobType, workplaceType, seniorityLevel,
+      jobFunction, industry, experienceYears,
+      requiredSkills, screeningQuestions,
+      applicantMode, applicantEmail, requireResume, externalUrl,
+    } = req.body;
+
+    const hrUser = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { id: true, role: true, name: true, email: true, university: true },
     });
-    
+
+    if (!hrUser) {
+      return res.status(401).json({ error: "Session is invalid. Please login again." });
+    }
+
+    if (hrUser.role !== "HR" && hrUser.role !== "ADMIN") {
+      return res.status(403).json({ error: "Your account does not have HR access." });
+    }
+
+    const computedOrganizationName =
+      (organizationName || universityName || hrUser?.university || hrUser?.name || "").trim();
+
+    const computedApplicationMode = applicantMode === "external" ? "EXTERNAL" : "PLATFORM";
+    const computedApplicationEmail =
+      (applicantEmail || (computedApplicationMode === "PLATFORM" ? hrUser?.email : "") || "").trim();
+
+    if (!title || !description || !location || !jobType) {
+      return res.status(400).json({ error: "title, description, location and jobType are required" });
+    }
+
+    const jobData: any = {
+      title,
+      organizationName: computedOrganizationName,
+      description,
+      location,
+      jobType: jobType || "FULL_TIME",
+      hrId: req.user.id,
+    };
+
+    // Extended fields (added via migration) — include only if present
+    if (workplaceType)    jobData.workplaceType    = workplaceType;
+    if (seniorityLevel)   jobData.seniorityLevel   = seniorityLevel;
+    if (jobFunction !== undefined) {
+      jobData.jobFunction = Array.isArray(jobFunction)
+        ? jobFunction.join(",")
+        : (jobFunction || "");
+    }
+    if (industry !== undefined) {
+      jobData.industry = Array.isArray(industry)
+        ? industry.join(",")
+        : (industry || "");
+    }
+    if (experienceYears !== undefined) jobData.experienceYears = Number(experienceYears) || 0;
+    if (requiredSkills !== undefined) {
+      jobData.requiredSkills = Array.isArray(requiredSkills)
+        ? requiredSkills.join(",")
+        : (requiredSkills || "");
+    }
+    if (screeningQuestions !== undefined) {
+      jobData.screeningQuestions = Array.isArray(screeningQuestions)
+        ? JSON.stringify(screeningQuestions) : (screeningQuestions || "[]");
+    }
+    if (applicantMode !== undefined) jobData.applicationMode = computedApplicationMode;
+    if (applicantEmail !== undefined || computedApplicationMode === "PLATFORM") {
+      jobData.applicationEmail = computedApplicationEmail;
+    }
+    if (requireResume !== undefined) jobData.requireResume = Boolean(requireResume);
+    if (externalUrl !== undefined) jobData.externalApplyUrl = externalUrl || "";
+
+    let job: any;
+    try {
+      job = await prisma.job.create({ data: jobData });
+    } catch (innerErr: any) {
+      // If extended fields not yet known by client, fall back to basic create
+      console.warn("Extended create failed, falling back to basic:", innerErr?.message);
+      job = await prisma.job.create({
+        data: { title, description, location, jobType: jobType || "FULL_TIME", hrId: req.user.id },
+      });
+    }
+
     res.status(201).json(job);
-  } catch (error) {
-    res.status(500).json({ error: "Failed to create job" });
+  } catch (error: any) {
+    console.error("CREATE JOB ERROR:", error);
+
+    if (error?.code === "P2003") {
+      return res.status(401).json({ error: "Session is invalid or expired. Please login again." });
+    }
+
+    res.status(500).json({ error: "Failed to create job", detail: String(error) });
   }
 });
 
