@@ -3,6 +3,7 @@
 
 generator client {
   provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
@@ -24,17 +25,29 @@ model User {
 }
 
 model Job {
-  id          String        @id @default(uuid())
-  hrId        String
-  hr          User          @relation(fields: [hrId], references: [id])
-  title       String
-  description String
-  location    String
-  jobType     String        // 'FULL_TIME', 'INTERNSHIP', 'CONTRACT'
-  status      String        @default("OPEN") // 'OPEN', 'CLOSED'
-  createdAt   DateTime      @default(now())
-  applications Application[]
-  savedBy      SavedJob[]
+  id                  String        @id @default(uuid())
+  hrId                String
+  hr                  User          @relation(fields: [hrId], references: [id])
+  title               String
+  organizationName    String        @default("")
+  description         String
+  location            String
+  jobType             String        // 'FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERNSHIP', 'TEMPORARY'
+  workplaceType       String        @default("ON_SITE") // 'ON_SITE', 'REMOTE', 'HYBRID'
+  seniorityLevel      String        @default("NOT_APPLICABLE") // 'NOT_APPLICABLE', 'INTERNSHIP', 'ENTRY', 'ASSOCIATE', 'MID_SENIOR', 'DIRECTOR', 'EXECUTIVE'
+  jobFunction         String        @default("") // comma-separated e.g. "Administrative,Education"
+  industry            String        @default("") // comma-separated e.g. "Higher Education"
+  experienceYears     Int           @default(0)
+  requiredSkills      String        @default("") // comma-separated
+  screeningQuestions  String        @default("") // JSON array string
+  applicationMode     String        @default("PLATFORM") // 'PLATFORM', 'EXTERNAL'
+  applicationEmail    String        @default("")
+  requireResume       Boolean       @default(true)
+  externalApplyUrl    String        @default("")
+  status              String        @default("OPEN") // 'OPEN', 'CLOSED'
+  createdAt           DateTime      @default(now())
+  applications        Application[]
+  savedBy             SavedJob[]
 }
 
 model Application {

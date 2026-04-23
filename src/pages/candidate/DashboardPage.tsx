@@ -63,7 +63,7 @@ export function DashboardPage() {
   const allJobs = (!isPending && fetchedJobs.length > 0) ? fetchedJobs.map(j => ({
     id: j.id, 
     title: j.title, 
-    universityName: j.hr?.name || "Unknown University", 
+    universityName: j.organizationName || j.hr?.university || j.hr?.name || "Unknown University", 
     category: j.jobType, 
     location: j.location, 
     experience: j.experience || "",
