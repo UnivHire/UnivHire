@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { GraduationCap, Eye, EyeOff, Check } from "lucide-react";
@@ -35,7 +35,7 @@ const TOTAL_STEPS = 4;
 
 export function SignupPage() {
   const navigate = useNavigate();
-  const { setAuth } = useAuthStore();
+  const { token, role, setAuth } = useAuthStore();
 
   const [step, setStep] = useState(1);
   const [showPass, setShowPass] = useState(false);
@@ -56,6 +56,19 @@ export function SignupPage() {
   const cities = state ? CITIES[state] || [] : [];
 
   const progressPct = ((step - 1) / (TOTAL_STEPS - 1)) * 100;
+
+  useEffect(() => {
+    if (!token || !role) return;
+
+    const destination =
+      role === "candidate"
+        ? "/dashboard"
+        : role === "hr"
+        ? "/hr/dashboard"
+        : "/admin";
+
+    navigate(destination, { replace: true });
+  }, [navigate, role, token]);
 
   const next = () => {
     setError("");
