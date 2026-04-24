@@ -3,10 +3,13 @@ import { LandingPage } from "./pages/LandingPage";
 import { LoginPage } from "./pages/LoginPage";
 import { SignupPage } from "./pages/SignupPage";
 import { InvitePage } from "./pages/InvitePage";
-import { DashboardPage } from "./pages/candidate/DashboardPage";
-import { JobDetailPage } from "./pages/candidate/JobDetailPage";
-import { ApplicationsPage } from "./pages/candidate/ApplicationsPage";
-import { SavedPage } from "./pages/candidate/SavedPage";
+import { CandidateDashboardPage } from "./pages/candidate/CandidateDashboardPage";
+import { CandidateJobDetailPage } from "./pages/candidate/CandidateJobDetailPage";
+import { CandidateApplicationsPage } from "./pages/candidate/CandidateApplicationsPage";
+import { CandidateSavedPage } from "./pages/candidate/CandidateSavedPage";
+import { CandidateProfilePage } from "./pages/candidate/CandidateProfilePage";
+import { CandidateSettingsPage } from "./pages/candidate/CandidateSettingsPage";
+import { CandidateNotificationsPage } from "./pages/candidate/CandidateNotificationsPage";
 import { HRDashboardPage } from "./pages/hr/HRDashboardPage";
 import { PostJobPage } from "./pages/hr/PostJobPage";
 import { HRJobsPage } from "./pages/hr/HRJobsPage";
@@ -16,6 +19,7 @@ import { HRProfilePage } from "./pages/hr/HRProfilePage";
 import { HRSettingsPage } from "./pages/hr/HRSettingsPage";
 import { AdminPage } from "./pages/admin/AdminPage";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { Toaster } from "./components/ui/toaster";
 
 function App() {
   return (
@@ -28,10 +32,13 @@ function App() {
         <Route path="/invite/:token" element={<InvitePage />} />
 
         {/* ── Candidate (protected) ───────────────── */}
-        <Route path="/dashboard" element={<ProtectedRoute requiredRole="candidate"><DashboardPage /></ProtectedRoute>} />
-        <Route path="/jobs/:id" element={<ProtectedRoute requiredRole="candidate"><JobDetailPage /></ProtectedRoute>} />
-        <Route path="/applications" element={<ProtectedRoute requiredRole="candidate"><ApplicationsPage /></ProtectedRoute>} />
-        <Route path="/saved" element={<ProtectedRoute requiredRole="candidate"><SavedPage /></ProtectedRoute>} />
+        <Route path="/dashboard" element={<ProtectedRoute requiredRole="candidate"><CandidateDashboardPage /></ProtectedRoute>} />
+        <Route path="/jobs/:id" element={<ProtectedRoute requiredRole="candidate"><CandidateJobDetailPage /></ProtectedRoute>} />
+        <Route path="/applications" element={<ProtectedRoute requiredRole="candidate"><CandidateApplicationsPage /></ProtectedRoute>} />
+        <Route path="/saved" element={<ProtectedRoute requiredRole="candidate"><CandidateSavedPage /></ProtectedRoute>} />
+        <Route path="/profile" element={<ProtectedRoute requiredRole="candidate"><CandidateProfilePage /></ProtectedRoute>} />
+        <Route path="/settings" element={<ProtectedRoute requiredRole="candidate"><CandidateSettingsPage /></ProtectedRoute>} />
+        <Route path="/notifications" element={<ProtectedRoute requiredRole="candidate"><CandidateNotificationsPage /></ProtectedRoute>} />
 
         {/* ── HR (protected) ──────────────────────── */}
         <Route path="/hr/dashboard" element={<ProtectedRoute requiredRole={["hr", "admin"]}><HRDashboardPage /></ProtectedRoute>} />
@@ -48,6 +55,7 @@ function App() {
         {/* ── Fallback ────────────────────────────── */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      <Toaster />
     </BrowserRouter>
   );
 }
