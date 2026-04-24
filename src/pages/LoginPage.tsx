@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { GraduationCap, Eye, EyeOff, AlertCircle } from "lucide-react";
@@ -9,13 +9,27 @@ export function LoginPage() {
   const [searchParams] = useSearchParams();
   const returnUrl = searchParams.get("returnUrl") || null;
 
-  const { setAuth } = useAuthStore();
+  const { token, role, setAuth } = useAuthStore();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!token || !role) return;
+
+    const destination =
+      returnUrl ||
+      (role === "candidate"
+        ? "/dashboard"
+        : role === "hr"
+        ? "/hr/dashboard"
+        : "/admin");
+
+    navigate(destination, { replace: true });
+  }, [navigate, returnUrl, role, token]);
 
   /* ── Demo quick-login (no backend during development) ── */
   const DEMO_ACCOUNTS: Record<string, { role: UserRole; user: AuthUser }> = {

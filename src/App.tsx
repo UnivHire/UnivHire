@@ -20,13 +20,31 @@ import { HRSettingsPage } from "./pages/hr/HRSettingsPage";
 import { AdminPage } from "./pages/admin/AdminPage";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Toaster } from "./components/ui/toaster";
+import { useAuthStore } from "./store/authStore";
+
+function RootRoute() {
+  const { token, role } = useAuthStore();
+
+  if (!token) {
+    return <LandingPage />;
+  }
+
+  const destination =
+    role === "candidate"
+      ? "/dashboard"
+      : role === "hr"
+      ? "/hr/dashboard"
+      : "/admin";
+
+  return <Navigate to={destination} replace />;
+}
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
         {/* ── Public ──────────────────────────────── */}
-        <Route path="/" element={<LandingPage />} />
+        <Route path="/" element={<RootRoute />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/invite/:token" element={<InvitePage />} />
