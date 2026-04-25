@@ -1,3 +1,4 @@
+import { API_BASE } from "../../lib/api";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, MapPin, Briefcase, ShieldCheck } from "lucide-react";
@@ -58,7 +59,7 @@ export function JobDetailPage() {
       }
 
       try {
-        const response = await fetch(`http://localhost:5000/api/jobs/${id}`);
+        const response = await fetch(`${API_BASE}/api/jobs/${id}`);
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "Failed to fetch job");
         setJob(data);
@@ -98,7 +99,7 @@ export function JobDetailPage() {
       formData.append("currentLocation", currentLocation);
       formData.append("resume", resumeFile);
 
-      const response = await fetch("http://localhost:5000/api/applications", {
+      const response = await fetch(`${API_BASE}/api/applications`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${token}`,

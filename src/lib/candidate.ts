@@ -1,3 +1,4 @@
+import { API_BASE } from "./api";
 import type { SavedJobRecord } from "../store/candidateStore";
 
 export interface CandidateJob {
@@ -13,6 +14,9 @@ export interface CandidateJob {
   salaryMinK?: number | null;
   salaryMaxK?: number | null;
   experience?: string;
+  workplaceType?: string;
+  organizationLogoUrl?: string;
+  cardTheme?: string;
 }
 
 export const FALLBACK_CANDIDATE_JOBS: CandidateJob[] = [
@@ -79,10 +83,17 @@ export const FALLBACK_CANDIDATE_JOBS: CandidateJob[] = [
 ];
 
 export function normalizeCandidateJob(raw: any): CandidateJob {
+  const rawLogo = raw?.organizationLogoUrl ? String(raw.organizationLogoUrl) : "";
+  const normalizedLogo = rawLogo.startsWith("http")
+    ? rawLogo
+    : rawLogo
+    ? `${API_BASE}${rawLogo}`
+    : "";
+
   return {
     id: String(raw?.id || ""),
     title: String(raw?.title || "Untitled role"),
-    universityName: String(raw?.hr?.name || raw?.universityName || "Verified University"),
+    universityName: String(raw?.organizationName || raw?.hr?.university || raw?.hr?.name || raw?.universityName || "Verified University"),
     category: String(raw?.jobType || raw?.category || "General"),
     location: String(raw?.location || "Location not specified"),
     description: String(raw?.description || "No description available yet."),
@@ -92,7 +103,33 @@ export function normalizeCandidateJob(raw: any): CandidateJob {
     salaryMinK: typeof raw?.salaryMinK === "number" ? raw.salaryMinK : null,
     salaryMaxK: typeof raw?.salaryMaxK === "number" ? raw.salaryMaxK : null,
     experience: raw?.experience ? String(raw.experience) : "",
+    workplaceType: raw?.workplaceType ? String(raw.workplaceType) : "",
+    organizationLogoUrl: normalizedLogo,
+    cardTheme: raw?.cardTheme ? String(raw.cardTheme) : "",
   };
+}
+
+const THEME_CLASS_BY_KEY: Record<string, string> = {
+  peach: "card-peach",
+  mint: "card-mint",
+  lavender: "card-lavender",
+  sky: "card-sky",
+  pink: "card-pink",
+  cream: "card-cream",
+};
+
+const THEME_KEYS = Object.keys(THEME_CLASS_BY_KEY);
+
+export function resolveJobThemeClass(job: CandidateJob): string {
+  const selected = (job.cardTheme || "").toLowerCase();
+  if (selected in THEME_CLASS_BY_KEY) {
+    return THEME_CLASS_BY_KEY[selected];
+  }
+
+  const base = job.id || job.title || "job";
+  const hash = Array.from(base).reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+  const key = THEME_KEYS[hash % THEME_KEYS.length];
+  return THEME_CLASS_BY_KEY[key];
 }
 
 export function toSavedJobRecord(job: CandidateJob): Omit<SavedJobRecord, "savedAt"> {

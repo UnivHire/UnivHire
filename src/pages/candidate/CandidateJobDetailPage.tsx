@@ -1,3 +1,4 @@
+import { API_BASE } from "../../lib/api";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
@@ -17,6 +18,7 @@ import {
   FALLBACK_CANDIDATE_JOBS,
   formatSalaryRange,
   normalizeCandidateJob,
+  resolveJobThemeClass,
   toSavedJobRecord,
   type CandidateJob,
 } from "../../lib/candidate";
@@ -40,7 +42,7 @@ export function CandidateJobDetailPage() {
   useEffect(() => {
     const fallback = FALLBACK_CANDIDATE_JOBS.find((item) => item.id === id) || null;
 
-    fetch(`http://localhost:5000/api/jobs/${id}`)
+    fetch(`${API_BASE}/api/jobs/${id}`)
       .then(async (res) => {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to fetch job");
@@ -54,6 +56,7 @@ export function CandidateJobDetailPage() {
   }, [id]);
 
   const isSaved = useMemo(() => (job ? Boolean(savedJobs[job.id]) : false), [job, savedJobs]);
+  const themeClass = job ? resolveJobThemeClass(job) : "card-peach";
 
   const handleApply = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,7 +80,7 @@ export function CandidateJobDetailPage() {
       formData.append("currentLocation", currentLocation);
       formData.append("resume", resumeFile);
 
-      const response = await fetch("http://localhost:5000/api/applications", {
+      const response = await fetch(`${API_BASE}/api/applications`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
@@ -97,7 +100,7 @@ export function CandidateJobDetailPage() {
     <div className="min-h-screen bg-background">
       <SmartNavbar />
 
-      <div className="mx-auto max-w-7xl px-6 py-10 md:px-10">
+      <div className="w-full px-6 py-10 md:px-10">
         <button
           type="button"
           onClick={() => navigate(-1)}
@@ -128,7 +131,7 @@ export function CandidateJobDetailPage() {
         ) : (
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(340px,0.8fr)]">
             <motion.section
-              className="rounded-[28px] bg-white p-8 shadow-sm"
+              className={`${themeClass} rounded-[28px] p-8 shadow-sm`}
               initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.35 }}
@@ -147,7 +150,16 @@ export function CandidateJobDetailPage() {
                     </span>
                   </div>
                   <h1 className="text-3xl font-bold text-foreground">{job.title}</h1>
-                  <p className="mt-2 text-sm font-semibold text-secondary">{job.universityName}</p>
+                  <div className="mt-2 flex items-center gap-2">
+                    {job.organizationLogoUrl ? (
+                      <img
+                        src={job.organizationLogoUrl}
+                        alt={`${job.universityName} logo`}
+                        className="h-7 w-7 rounded-md border border-foreground/15 object-cover"
+                      />
+                    ) : null}
+                    <p className="text-sm font-semibold text-secondary">{job.universityName}</p>
+                  </div>
                 </div>
 
                 <button
@@ -211,7 +223,7 @@ export function CandidateJobDetailPage() {
                       "Easy to compare with other shortlisted jobs before applying.",
                     ].map((item) => (
                       <div key={item} className="rounded-2xl bg-background px-4 py-4 text-sm text-foreground/75">
-                        <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-white text-foreground">
+                        <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-white/70 text-foreground">
                           <ShieldCheck size={15} />
                         </div>
                         {item}

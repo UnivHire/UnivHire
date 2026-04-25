@@ -1,9 +1,7 @@
-import { Bookmark, BookmarkCheck, MapPin, ShieldCheck } from "lucide-react";
+import { Bookmark, BookmarkCheck, Building2, MapPin, ShieldCheck } from "lucide-react";
 import { motion } from "framer-motion";
 import type { CandidateJob } from "../../lib/candidate";
-import { formatRelativeDate, formatSalaryRange } from "../../lib/candidate";
-
-const CARD_COLORS = ["card-peach", "card-mint", "card-lavender", "card-sky", "card-pink", "card-cream"];
+import { formatRelativeDate, formatSalaryRange, resolveJobThemeClass } from "../../lib/candidate";
 
 export function CandidateJobCard({
   job,
@@ -18,8 +16,13 @@ export function CandidateJobCard({
   onToggleSave: () => void;
   onOpen: () => void;
 }) {
-  const cardColor = CARD_COLORS[index % CARD_COLORS.length];
-  const tags = [job.category, job.status === "OPEN" ? "Open" : "Closed", job.isVerified ? "Verified" : "Review"];
+  const cardColor = resolveJobThemeClass(job);
+  const tags = [
+    job.workplaceType ? job.workplaceType.replace("_", "-") : null,
+    job.category,
+    job.status === "OPEN" ? "Open" : "Closed",
+    job.isVerified ? "Verified" : "Review",
+  ].filter(Boolean) as string[];
 
   return (
     <motion.article
@@ -30,11 +33,25 @@ export function CandidateJobCard({
     >
       <div>
         <div className="mb-4 flex items-start justify-between gap-3">
-          <div>
+          <div className="flex items-start gap-3">
+            {job.organizationLogoUrl ? (
+              <img
+                src={job.organizationLogoUrl}
+                alt={`${job.universityName} logo`}
+                className="h-11 w-11 rounded-lg border border-foreground/10 object-cover"
+              />
+            ) : (
+              <div className="flex h-11 w-11 items-center justify-center rounded-lg border border-dashed border-foreground/20 bg-white/40 text-foreground/60">
+                <Building2 size={15} />
+              </div>
+            )}
+
+            <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-foreground/50">
               {formatRelativeDate(job.createdAt)}
             </p>
             <p className="mt-1 text-xs font-medium text-foreground/60">{job.universityName}</p>
+            </div>
           </div>
           <button
             type="button"

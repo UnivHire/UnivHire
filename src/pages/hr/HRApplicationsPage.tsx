@@ -1,7 +1,8 @@
+import { API_BASE } from "../../lib/api";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Briefcase, CalendarDays, Mail, MapPin, UserRound } from "lucide-react";
 import { SmartNavbar } from "../../components/SmartNavbar";
 import { useAuthStore } from "../../store/authStore";
 
@@ -12,6 +13,23 @@ const STATUS_COLOR: Record<string, string> = {
   REJECTED: "bg-red-100 text-red-600",
   HIRED: "bg-purple-100 text-purple-700",
 };
+
+const CARD_COLORS = ["card-peach", "card-mint", "card-lavender", "card-sky", "card-pink", "card-cream"];
+
+function resolveCardClass(app: any) {
+  const seed = String(app?.id || app?.job?.title || app?.candidate?.email || "application");
+  const hash = Array.from(seed).reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+  return CARD_COLORS[hash % CARD_COLORS.length];
+}
+
+function formatDate(iso?: string) {
+  if (!iso) return "Recently";
+  return new Date(iso).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
 
 export function HRApplicationsPage() {
   const navigate = useNavigate();
@@ -29,7 +47,7 @@ export function HRApplicationsPage() {
     }
 
     try {
-      const response = await fetch("http://localhost:5000/api/applications", {
+      const response = await fetch(`${API_BASE}/api/applications`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await response.json();
@@ -52,7 +70,7 @@ export function HRApplicationsPage() {
 
   const updateStatus = async (applicationId: string, status: string) => {
     if (!token) return;
-    const response = await fetch(`http://localhost:5000/api/applications/${applicationId}/status`, {
+    const response = await fetch(`${API_BASE}/api/applications/${applicationId}/status`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
@@ -71,7 +89,7 @@ export function HRApplicationsPage() {
   return (
     <div className="min-h-screen bg-background">
       <SmartNavbar />
-      <div className="mx-auto max-w-5xl px-6 py-10 md:px-10">
+      <div className="w-full px-6 py-10 md:px-10">
         <button type="button" onClick={() => navigate("/hr/dashboard")} className="mb-6 flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition">
           <ArrowLeft size={15} /> Back to dashboard
         </button>
@@ -95,22 +113,47 @@ export function HRApplicationsPage() {
         )}
 
         {!isPending && apps && apps.length > 0 && (
-          <div className="space-y-3">
+          <div className="grid gap-4 md:grid-cols-2">
             {apps.map((app, i) => (
-              <motion.div key={app.id} className="rounded-2xl bg-white px-6 py-5 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
-                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
-                <div>
-                  <p className="font-semibold text-foreground">{app.candidate?.name || "Candidate"}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{app.candidate?.email || "No email"} · Applied {new Date(app.appliedAt).toLocaleDateString("en-IN")}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{app.job?.title || "Job"} · {app.job?.location || "Location"}</p>
+              <motion.div
+                key={app.id}
+                className={`${resolveCardClass(app)} rounded-2xl border border-border p-5 shadow-sm`}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.04 }}
+              >
+                <div className="mb-4 flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-foreground/15 bg-white/60 text-foreground">
+                      <UserRound size={16} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-foreground">{app.candidate?.name || "Candidate"}</p>
+                      <p className="mt-0.5 flex items-center gap-1 text-xs text-foreground/65 truncate"><Mail size={11} />{app.candidate?.email || "No email"}</p>
+                    </div>
+                  </div>
+                  <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_COLOR[String(app.status).toUpperCase()] || "bg-muted text-muted-foreground"}`}>
+                    {String(app.status || "PENDING").charAt(0) + String(app.status || "PENDING").slice(1).toLowerCase()}
+                  </span>
+                </div>
+
+                <div className="mb-4 grid gap-2 text-xs text-foreground/70 sm:grid-cols-2">
+                  <p className="flex items-center gap-1.5"><Briefcase size={12} />{app.job?.title || "Job"}</p>
+                  <p className="flex items-center gap-1.5"><MapPin size={12} />{app.job?.location || "Location"}</p>
+                  <p className="flex items-center gap-1.5"><CalendarDays size={12} />Applied {formatDate(app.appliedAt)}</p>
+                  <p className="flex items-center gap-1.5"><Briefcase size={12} />{app.job?.jobType || "N/A"}</p>
+                </div>
+
+                <div className="mb-4">
                   <button
                     type="button"
                     onClick={() => navigate(`/hr/applications/${app.id}`)}
-                    className="mt-1 text-xs font-semibold text-secondary hover:underline"
+                    className="text-xs font-semibold text-secondary hover:underline"
                   >
                     View Application
                   </button>
                 </div>
+
                 <div className="flex items-center gap-2 flex-wrap">
                   {STATUSES.map((s) => (
                     <button key={s} type="button" onClick={() => updateStatus(app.id, s)}

@@ -18,8 +18,51 @@ app.use(express.json());
 
 const uploadsRoot = path.join(process.cwd(), "uploads");
 const resumesDir = path.join(uploadsRoot, "resumes");
+const logosDir = path.join(uploadsRoot, "logos");
+const jobMediaStoreFile = path.join(uploadsRoot, "job-media.json");
 fs.mkdirSync(resumesDir, { recursive: true });
+fs.mkdirSync(logosDir, { recursive: true });
+if (!fs.existsSync(jobMediaStoreFile)) {
+  fs.writeFileSync(jobMediaStoreFile, "{}", "utf8");
+}
 app.use("/uploads", express.static(uploadsRoot));
+
+type JobTheme = "peach" | "mint" | "lavender" | "sky" | "pink" | "cream";
+type JobMedia = { organizationLogoUrl?: string; cardTheme?: JobTheme };
+
+const allowedThemes = new Set<JobTheme>(["peach", "mint", "lavender", "sky", "pink", "cream"]);
+
+function normalizeTheme(value: unknown): JobTheme | undefined {
+  const raw = String(value || "").toLowerCase() as JobTheme;
+  return allowedThemes.has(raw) ? raw : undefined;
+}
+
+function readJobMediaStore(): Record<string, JobMedia> {
+  try {
+    const raw = fs.readFileSync(jobMediaStoreFile, "utf8");
+    const parsed = JSON.parse(raw || "{}");
+    if (parsed && typeof parsed === "object") return parsed;
+    return {};
+  } catch {
+    return {};
+  }
+}
+
+function writeJobMediaStore(data: Record<string, JobMedia>) {
+  fs.writeFileSync(jobMediaStoreFile, JSON.stringify(data, null, 2), "utf8");
+}
+
+function upsertJobMedia(jobId: string, patch: JobMedia) {
+  const store = readJobMediaStore();
+  const current = store[jobId] || {};
+  store[jobId] = { ...current, ...patch };
+  writeJobMediaStore(store);
+}
+
+function enrichJobWithMedia(job: any) {
+  const media = readJobMediaStore()[String(job?.id || "")] || {};
+  return { ...job, organizationLogoUrl: media.organizationLogoUrl || "", cardTheme: media.cardTheme || "" };
+}
 
 const upload = multer({
   storage: multer.diskStorage({
@@ -33,6 +76,25 @@ const upload = multer({
   fileFilter: (_req: any, file: any, cb: any) => {
     if (file.mimetype !== "application/pdf") {
       cb(new Error("Only PDF resumes are allowed"));
+      return;
+    }
+    cb(null, true);
+  },
+});
+
+const uploadJobLogo = multer({
+  storage: multer.diskStorage({
+    destination: (_req: any, _file: any, cb: any) => cb(null, logosDir),
+    filename: (_req: any, file: any, cb: any) => {
+      const ext = path.extname(file.originalname || "").toLowerCase();
+      const safeExt = ext || ".png";
+      cb(null, `${Date.now()}-${Math.round(Math.random() * 1e8)}${safeExt}`);
+    },
+  }),
+  limits: { fileSize: 2 * 1024 * 1024 },
+  fileFilter: (_req: any, file: any, cb: any) => {
+    if (!String(file.mimetype || "").startsWith("image/")) {
+      cb(new Error("Only image files are allowed"));
       return;
     }
     cb(null, true);
@@ -61,7 +123,7 @@ const authenticateToken = (req: any, res: any, next: any) => {
 app.post("/api/auth/register", async (req: any, res: any) => {
   try {
     const { email, password, name, role, university } = req.body;
-    
+
     // Check if user exists
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
@@ -83,7 +145,7 @@ app.post("/api/auth/register", async (req: any, res: any) => {
     });
 
     const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-    
+
     res.status(201).json({
       token,
       user: { id: user.id, email: user.email, name: user.name, role: user.role, university: user.university }
@@ -112,7 +174,7 @@ app.post("/api/auth/login", async (req: any, res: any) => {
     }
 
     const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-    
+
     res.json({
       token,
       user: { id: user.id, email: user.email, name: user.name, role: user.role, university: user.university }
@@ -128,7 +190,7 @@ app.get("/api/auth/me", authenticateToken, async (req: any, res: any) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user.id } });
     if (!user) return res.status(404).json({ error: "User not found" });
-    
+
     res.json({
       id: user.id, email: user.email, name: user.name, role: user.role, university: user.university
     });
@@ -154,7 +216,7 @@ app.get("/api/jobs", async (req: any, res: any) => {
       include: { hr: { select: { name: true, email: true, university: true } } },
       orderBy: { createdAt: 'desc' }
     });
-    res.json(jobs);
+    res.json(jobs.map(enrichJobWithMedia));
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Failed to fetch jobs" });
@@ -173,7 +235,7 @@ app.get("/api/jobs/:id", async (req: any, res: any) => {
       return res.status(404).json({ error: "Job not found" });
     }
 
-    return res.json(job);
+    return res.json(enrichJobWithMedia(job));
   } catch (error) {
     return res.status(500).json({ error: "Failed to fetch job" });
   }
@@ -192,6 +254,7 @@ app.post("/api/jobs", authenticateToken, async (req: any, res: any) => {
       jobFunction, industry, experienceYears,
       requiredSkills, screeningQuestions,
       applicantMode, applicantEmail, requireResume, externalUrl,
+      cardTheme,
     } = req.body;
 
     const hrUser = await prisma.user.findUnique({
@@ -228,8 +291,8 @@ app.post("/api/jobs", authenticateToken, async (req: any, res: any) => {
     };
 
     // Extended fields (added via migration) — include only if present
-    if (workplaceType)    jobData.workplaceType    = workplaceType;
-    if (seniorityLevel)   jobData.seniorityLevel   = seniorityLevel;
+    if (workplaceType) jobData.workplaceType = workplaceType;
+    if (seniorityLevel) jobData.seniorityLevel = seniorityLevel;
     if (jobFunction !== undefined) {
       jobData.jobFunction = Array.isArray(jobFunction)
         ? jobFunction.join(",")
@@ -268,7 +331,12 @@ app.post("/api/jobs", authenticateToken, async (req: any, res: any) => {
       });
     }
 
-    res.status(201).json(job);
+    const normalizedTheme = normalizeTheme(cardTheme);
+    if (normalizedTheme) {
+      upsertJobMedia(String(job.id), { cardTheme: normalizedTheme });
+    }
+
+    res.status(201).json(enrichJobWithMedia(job));
   } catch (error: any) {
     console.error("CREATE JOB ERROR:", error);
 
@@ -277,6 +345,38 @@ app.post("/api/jobs", authenticateToken, async (req: any, res: any) => {
     }
 
     res.status(500).json({ error: "Failed to create job", detail: String(error) });
+  }
+});
+
+app.post("/api/jobs/:id/logo", authenticateToken, uploadJobLogo.single("logo"), async (req: any, res: any) => {
+  try {
+    if (req.user.role !== "HR" && req.user.role !== "ADMIN") {
+      return res.status(403).json({ error: "Forbidden. HR access required." });
+    }
+
+    const job = await prisma.job.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, hrId: true },
+    });
+
+    if (!job) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+
+    if (req.user.role !== "ADMIN" && job.hrId !== req.user.id) {
+      return res.status(403).json({ error: "You can upload logos only for your own jobs" });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: "Logo file is required" });
+    }
+
+    const logoUrl = `/uploads/logos/${req.file.filename}`;
+    upsertJobMedia(String(job.id), { organizationLogoUrl: logoUrl });
+
+    return res.json({ ok: true, logoUrl });
+  } catch (error) {
+    return res.status(500).json({ error: "Failed to upload logo" });
   }
 });
 
@@ -293,7 +393,7 @@ app.post("/api/applications", authenticateToken, upload.single("resume"), async 
     if (!jobId) {
       return res.status(400).json({ error: "jobId is required" });
     }
-    
+
     const application = await prisma.application.create({
       data: {
         jobId,
@@ -455,6 +555,241 @@ app.delete("/api/jobs/:id", authenticateToken, async (req: any, res: any) => {
     return res.json({ success: true });
   } catch (error) {
     return res.status(500).json({ error: "Failed to delete job" });
+  }
+});
+
+// ─── 8. User Profile: Get own profile ────────────────────────────────────────
+app.get("/api/users/profile", authenticateToken, async (req: any, res: any) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    const { passwordHash: _pw, ...safe } = user as any;
+    return res.json(safe);
+  } catch {
+    return res.status(500).json({ error: "Failed to fetch profile" });
+  }
+});
+
+// ─── 9. User Profile: Update own profile ─────────────────────────────────────
+app.patch("/api/users/profile", authenticateToken, async (req: any, res: any) => {
+  try {
+    const allowed = [
+      "name", "phone", "headline", "about", "resumeUrl", "portfolioUrl",
+      "experienceLevel", "availability", "skills", "preferredRole", "location",
+      "designation", "department", "university", "website", "linkedin", "bio",
+      "notificationSettings", "preferences",
+    ];
+    const data: Record<string, any> = {};
+    for (const key of allowed) {
+      if (key in req.body) data[key] = req.body[key];
+    }
+    const updated = await prisma.user.update({
+      where: { id: req.user.id },
+      data,
+    });
+    const { passwordHash: _pw, ...safe } = updated as any;
+    return res.json(safe);
+  } catch {
+    return res.status(500).json({ error: "Failed to update profile" });
+  }
+});
+
+// ─── 10. Security: Change password ───────────────────────────────────────────
+app.post("/api/users/change-password", authenticateToken, async (req: any, res: any) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword || newPassword.length < 8) {
+      return res.status(400).json({ error: "Invalid password data" });
+    }
+    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!valid) return res.status(400).json({ error: "Current password is incorrect" });
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await prisma.user.update({ where: { id: req.user.id }, data: { passwordHash } });
+    return res.json({ ok: true });
+  } catch {
+    return res.status(500).json({ error: "Failed to change password" });
+  }
+});
+
+// ─── 11. Saved Jobs: List saved jobs for current candidate ────────────────────
+app.get("/api/saved-jobs", authenticateToken, async (req: any, res: any) => {
+  try {
+    if (req.user.role !== "CANDIDATE") {
+      return res.status(403).json({ error: "Candidates only" });
+    }
+    const saved = await prisma.savedJob.findMany({
+      where: { candidateId: req.user.id },
+      include: { job: { include: { hr: { select: { name: true, university: true } } } } },
+      orderBy: { savedAt: "desc" },
+    });
+    return res.json(saved.map((s: any) => ({ ...s.job, savedAt: s.savedAt })));
+  } catch {
+    return res.status(500).json({ error: "Failed to fetch saved jobs" });
+  }
+});
+
+// ─── 12. Saved Jobs: Save a job ───────────────────────────────────────────────
+app.post("/api/saved-jobs", authenticateToken, async (req: any, res: any) => {
+  try {
+    if (req.user.role !== "CANDIDATE") {
+      return res.status(403).json({ error: "Candidates only" });
+    }
+    const { jobId } = req.body;
+    if (!jobId) return res.status(400).json({ error: "jobId is required" });
+
+    const record = await prisma.savedJob.upsert({
+      where: { candidateId_jobId: { candidateId: req.user.id, jobId } },
+      create: { candidateId: req.user.id, jobId },
+      update: {},
+    });
+    return res.status(201).json(record);
+  } catch {
+    return res.status(500).json({ error: "Failed to save job" });
+  }
+});
+
+// ─── 13. Saved Jobs: Unsave a job ─────────────────────────────────────────────
+app.delete("/api/saved-jobs/:jobId", authenticateToken, async (req: any, res: any) => {
+  try {
+    if (req.user.role !== "CANDIDATE") {
+      return res.status(403).json({ error: "Candidates only" });
+    }
+    await prisma.savedJob.deleteMany({
+      where: { candidateId: req.user.id, jobId: req.params.jobId },
+    });
+    return res.json({ ok: true });
+  } catch {
+    return res.status(500).json({ error: "Failed to unsave job" });
+  }
+});
+
+// ─── 14. Admin: Stats ────────────────────────────────────────────────────────
+app.get("/api/admin/stats", authenticateToken, async (req: any, res: any) => {
+  try {
+    if (req.user.role !== "ADMIN") return res.status(403).json({ error: "Admin only" });
+    const [totalJobs, totalApplications, totalUsers] = await Promise.all([
+      prisma.job.count(),
+      prisma.application.count(),
+      prisma.user.count(),
+    ]);
+    return res.json({ totalJobs, totalApplications, totalUsers });
+  } catch {
+    return res.status(500).json({ error: "Failed to fetch stats" });
+  }
+});
+
+// ─── 15. Admin: List all jobs ────────────────────────────────────────────────
+app.get("/api/admin/jobs", authenticateToken, async (req: any, res: any) => {
+  try {
+    if (req.user.role !== "ADMIN") return res.status(403).json({ error: "Admin only" });
+    const jobs = await prisma.job.findMany({
+      include: { hr: { select: { name: true, email: true, university: true } } },
+      orderBy: { createdAt: "desc" },
+    });
+    return res.json(jobs.map(enrichJobWithMedia));
+  } catch {
+    return res.status(500).json({ error: "Failed to fetch jobs" });
+  }
+});
+
+// ─── 16. Admin: Toggle job verification ──────────────────────────────────────
+app.patch("/api/admin/jobs/:id/verify", authenticateToken, async (req: any, res: any) => {
+  try {
+    if (req.user.role !== "ADMIN") return res.status(403).json({ error: "Admin only" });
+    const job = await prisma.job.findUnique({ where: { id: req.params.id } });
+    if (!job) return res.status(404).json({ error: "Job not found" });
+
+    const updated = await prisma.job.update({
+      where: { id: req.params.id },
+      data: { isVerified: !job.isVerified },
+    });
+    return res.json(enrichJobWithMedia(updated));
+  } catch {
+    return res.status(500).json({ error: "Failed to update job" });
+  }
+});
+
+// ─── 17. Admin: List all users ───────────────────────────────────────────────
+app.get("/api/admin/users", authenticateToken, async (req: any, res: any) => {
+  try {
+    if (req.user.role !== "ADMIN") return res.status(403).json({ error: "Admin only" });
+    const users = await prisma.user.findMany({
+      select: { id: true, name: true, email: true, role: true, university: true, createdAt: true },
+      orderBy: { createdAt: "desc" },
+    });
+    return res.json(users);
+  } catch {
+    return res.status(500).json({ error: "Failed to fetch users" });
+  }
+});
+
+// ─── 18. Invites: Create invite (HR/Admin) ────────────────────────────────────
+app.post("/api/invites", authenticateToken, async (req: any, res: any) => {
+  try {
+    if (req.user.role !== "HR" && req.user.role !== "ADMIN") {
+      return res.status(403).json({ error: "HR or Admin access required" });
+    }
+    const { email, role = "HR" } = req.body;
+    if (!email) return res.status(400).json({ error: "email is required" });
+
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+    const invite = await prisma.invite.create({
+      data: { email, role, senderId: req.user.id, expiresAt },
+    });
+    return res.status(201).json(invite);
+  } catch {
+    return res.status(500).json({ error: "Failed to create invite" });
+  }
+});
+
+// ─── 19. Invites: Validate & redeem invite ────────────────────────────────────
+app.get("/api/invites/:token", async (req: any, res: any) => {
+  try {
+    const invite = await prisma.invite.findUnique({ where: { token: req.params.token } });
+    if (!invite) return res.status(404).json({ error: "Invite not found" });
+    if (invite.used) return res.status(410).json({ error: "Invite already used" });
+    if (new Date() > invite.expiresAt) return res.status(410).json({ error: "Invite expired" });
+    return res.json({ email: invite.email, role: invite.role });
+  } catch {
+    return res.status(500).json({ error: "Failed to validate invite" });
+  }
+});
+
+// ─── 20. Invites: Activate account via invite ─────────────────────────────────
+app.post("/api/invites/:token/activate", async (req: any, res: any) => {
+  try {
+    const invite = await prisma.invite.findUnique({ where: { token: req.params.token } });
+    if (!invite) return res.status(404).json({ error: "Invite not found" });
+    if (invite.used) return res.status(410).json({ error: "Invite already used" });
+    if (new Date() > invite.expiresAt) return res.status(410).json({ error: "Invite expired" });
+
+    const { name, university, password } = req.body;
+    if (!name || !password || password.length < 8) {
+      return res.status(400).json({ error: "name and password (min 8 chars) are required" });
+    }
+
+    const existingUser = await prisma.user.findUnique({ where: { email: invite.email } });
+    if (existingUser) return res.status(400).json({ error: "Email already registered" });
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const user = await prisma.user.create({
+      data: { email: invite.email, passwordHash, name, role: invite.role, university },
+    });
+
+    await prisma.invite.update({ where: { token: req.params.token }, data: { used: true } });
+
+    const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: "7d" });
+    return res.status(201).json({
+      token,
+      user: { id: user.id, email: user.email, name: user.name, role: user.role, university: user.university },
+    });
+  } catch {
+    return res.status(500).json({ error: "Failed to activate account" });
   }
 });
 

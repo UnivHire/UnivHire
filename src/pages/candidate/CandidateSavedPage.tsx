@@ -4,58 +4,54 @@ import { ArrowLeft, Search } from "lucide-react";
 import { SmartNavbar } from "../../components/SmartNavbar";
 import { CandidatePageHeader } from "../../components/candidate/CandidatePageHeader";
 import { CandidateJobCard } from "../../components/candidate/CandidateJobCard";
-import { useCandidateStore } from "../../store/candidateStore";
-import { FALLBACK_CANDIDATE_JOBS, normalizeCandidateJob, type CandidateJob } from "../../lib/candidate";
+import { normalizeCandidateJob, type CandidateJob } from "../../lib/candidate";
+import { useAuthStore } from "../../store/authStore";
+import { API_BASE } from "../../lib/api";
 
 export function CandidateSavedPage() {
   const navigate = useNavigate();
-  const { savedJobs, unsaveJob } = useCandidateStore();
+  const { token } = useAuthStore();
   const [search, setSearch] = useState("");
   const [fetchedJobs, setFetchedJobs] = useState<CandidateJob[]>([]);
 
   useEffect(() => {
-    fetch("http://localhost:5000/api/jobs")
+    if (!token) return;
+    fetch(`${API_BASE}/api/saved-jobs`, { headers: { Authorization: `Bearer ${token}` } })
       .then((res) => res.json())
       .then((data) => {
         setFetchedJobs(Array.isArray(data) ? data.map(normalizeCandidateJob) : []);
       })
       .catch(() => undefined);
-  }, []);
+  }, [token]);
+
+  const handleUnsave = async (jobId: string) => {
+    if (!token) return;
+    try {
+      await fetch(`${API_BASE}/api/saved-jobs/${jobId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setFetchedJobs((prev) => prev.filter((j) => j.id !== jobId));
+    } catch {}
+  };
 
   const savedList = useMemo(() => {
-    const baseJobs = fetchedJobs.length > 0 ? fetchedJobs : FALLBACK_CANDIDATE_JOBS;
-    return Object.values(savedJobs)
-      .map((saved) => {
-        const liveJob = baseJobs.find((job) => job.id === saved.id);
-        return (
-          liveJob || {
-            id: saved.id,
-            title: saved.title,
-            universityName: saved.universityName,
-            category: saved.jobType,
-            location: saved.location,
-            description: saved.description,
-            isVerified: true,
-            status: "OPEN",
-          }
-        );
-      })
-      .filter((job) => {
-        const query = search.trim().toLowerCase();
-        if (!query) return true;
-        return (
-          job.title.toLowerCase().includes(query) ||
-          job.universityName.toLowerCase().includes(query) ||
-          job.category.toLowerCase().includes(query)
-        );
-      });
-  }, [fetchedJobs, savedJobs, search]);
+    return fetchedJobs.filter((job) => {
+      const query = search.trim().toLowerCase();
+      if (!query) return true;
+      return (
+        job.title.toLowerCase().includes(query) ||
+        job.universityName.toLowerCase().includes(query) ||
+        job.category.toLowerCase().includes(query)
+      );
+    });
+  }, [fetchedJobs, search]);
 
   return (
     <div className="min-h-screen bg-background">
       <SmartNavbar />
 
-      <div className="mx-auto max-w-7xl px-6 py-10 md:px-10">
+      <div className="w-full px-6 py-10 md:px-10">
         <button
           type="button"
           onClick={() => navigate("/dashboard")}
@@ -114,7 +110,7 @@ export function CandidateSavedPage() {
                 job={job}
                 index={index}
                 saved
-                onToggleSave={() => unsaveJob(job.id)}
+                onToggleSave={() => handleUnsave(job.id)}
                 onOpen={() => navigate(`/jobs/${job.id}`)}
               />
             ))}

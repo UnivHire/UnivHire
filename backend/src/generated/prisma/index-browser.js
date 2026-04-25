@@ -125,6 +125,23 @@ exports.Prisma.UserScalarFieldEnum = {
   name: 'name',
   role: 'role',
   university: 'university',
+  phone: 'phone',
+  headline: 'headline',
+  about: 'about',
+  resumeUrl: 'resumeUrl',
+  portfolioUrl: 'portfolioUrl',
+  experienceLevel: 'experienceLevel',
+  availability: 'availability',
+  skills: 'skills',
+  preferredRole: 'preferredRole',
+  location: 'location',
+  designation: 'designation',
+  department: 'department',
+  website: 'website',
+  linkedin: 'linkedin',
+  bio: 'bio',
+  notificationSettings: 'notificationSettings',
+  preferences: 'preferences',
   createdAt: 'createdAt'
 };
 
@@ -148,6 +165,7 @@ exports.Prisma.JobScalarFieldEnum = {
   requireResume: 'requireResume',
   externalApplyUrl: 'externalApplyUrl',
   status: 'status',
+  isVerified: 'isVerified',
   createdAt: 'createdAt'
 };
 
@@ -165,7 +183,19 @@ exports.Prisma.ApplicationScalarFieldEnum = {
 
 exports.Prisma.SavedJobScalarFieldEnum = {
   candidateId: 'candidateId',
-  jobId: 'jobId'
+  jobId: 'jobId',
+  savedAt: 'savedAt'
+};
+
+exports.Prisma.InviteScalarFieldEnum = {
+  id: 'id',
+  token: 'token',
+  email: 'email',
+  role: 'role',
+  senderId: 'senderId',
+  used: 'used',
+  expiresAt: 'expiresAt',
+  createdAt: 'createdAt'
 };
 
 exports.Prisma.SortOrder = {
@@ -183,7 +213,8 @@ exports.Prisma.ModelName = {
   User: 'User',
   Job: 'Job',
   Application: 'Application',
-  SavedJob: 'SavedJob'
+  SavedJob: 'SavedJob',
+  Invite: 'Invite'
 };
 
 /**

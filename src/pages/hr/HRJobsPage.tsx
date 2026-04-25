@@ -1,11 +1,39 @@
+import { API_BASE } from "../../lib/api";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, PlusCircle, MapPin, Briefcase } from "lucide-react";
+import { ArrowLeft, PlusCircle, MapPin, Briefcase, Building2, CalendarDays } from "lucide-react";
 import { SmartNavbar } from "../../components/SmartNavbar";
 import { useAuthStore } from "../../store/authStore";
 
 const ROLE_FILTERS = ["All", "Trainer", "Driver", "Faculty", "Security", "Peon", "Operations", "Admin Staff", "Other"];
+
+const THEME_CLASS_BY_KEY: Record<string, string> = {
+  peach: "card-peach",
+  mint: "card-mint",
+  lavender: "card-lavender",
+  sky: "card-sky",
+  pink: "card-pink",
+  cream: "card-cream",
+};
+
+function resolveThemeClass(job: any) {
+  const selected = String(job?.cardTheme || "").toLowerCase();
+  if (selected && THEME_CLASS_BY_KEY[selected]) return THEME_CLASS_BY_KEY[selected];
+  const keys = Object.keys(THEME_CLASS_BY_KEY);
+  const base = String(job?.id || job?.title || "job");
+  const hash = Array.from(base).reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+  return THEME_CLASS_BY_KEY[keys[hash % keys.length]];
+}
+
+function formatPostedDate(iso?: string) {
+  if (!iso) return "Recently";
+  return new Date(iso).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
 
 export function HRJobsPage() {
   const navigate = useNavigate();
@@ -17,7 +45,7 @@ export function HRJobsPage() {
 
   const loadJobs = async () => {
     try {
-      const response = await fetch("http://localhost:5000/api/jobs");
+      const response = await fetch(`${API_BASE}/api/jobs`);
       const data = await response.json();
       if (!response.ok) throw new Error("Failed to fetch jobs");
       const hrJobs = (data || []).filter((j: any) => j?.hrId === user?.id);
@@ -40,7 +68,7 @@ export function HRJobsPage() {
 
   const removeJob = async (jobId: string) => {
     if (!token) return;
-    const response = await fetch(`http://localhost:5000/api/jobs/${jobId}`, {
+    const response = await fetch(`${API_BASE}/api/jobs/${jobId}`, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -60,7 +88,7 @@ export function HRJobsPage() {
   return (
     <div className="min-h-screen bg-background">
       <SmartNavbar />
-      <div className="mx-auto max-w-5xl px-6 py-10 md:px-10">
+      <div className="w-full px-6 py-10 md:px-10">
         <button type="button" onClick={() => navigate("/hr/dashboard")} className="mb-6 flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition">
           <ArrowLeft size={15} /> Back to dashboard
         </button>
@@ -112,7 +140,7 @@ export function HRJobsPage() {
           </label>
         </div>
 
-        {isPending && <div className="space-y-3">{[1,2,3].map((i) => <div key={i} className="h-24 rounded-2xl bg-muted animate-pulse" />)}</div>}
+        {isPending && <div className="space-y-3">{[1, 2, 3].map((i) => <div key={i} className="h-24 rounded-2xl bg-muted animate-pulse" />)}</div>}
         {!isPending && (!jobs || jobs.length === 0) && (
           <div className="rounded-2xl bg-white p-10 text-center shadow-sm">
             <p className="mb-4 text-muted-foreground">No job postings yet.</p>
@@ -120,28 +148,74 @@ export function HRJobsPage() {
           </div>
         )}
         {!isPending && jobs && jobs.length > 0 && (
-          <div className="space-y-3">
+          <div className="grid gap-4 md:grid-cols-2">
             {filteredAndSortedJobs.map((j, i) => (
-              <motion.div key={j.id} className="rounded-2xl bg-white px-6 py-5 shadow-sm flex items-center justify-between gap-4"
-                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-foreground truncate">{j.title}</p>
-                  <div className="flex gap-3 mt-1 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1"><MapPin size={11} />{j.location}</span>
-                    <span className="flex items-center gap-1"><Briefcase size={11} />{j.jobType}</span>
+              <motion.div
+                key={j.id}
+                className={`${resolveThemeClass(j)} rounded-2xl border border-border p-5 shadow-sm`}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.04 }}
+              >
+                <div className="mb-4 flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-start gap-3">
+                    {j.organizationLogoUrl ? (
+                      <img
+                        src={String(j.organizationLogoUrl).startsWith("http") ? j.organizationLogoUrl : `${API_BASE}${j.organizationLogoUrl}`}
+                        alt={`${j.organizationName || j.title} logo`}
+                        className="h-11 w-11 shrink-0 rounded-lg border border-border object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-dashed border-border bg-white/40 text-foreground/60">
+                        <Building2 size={16} />
+                      </div>
+                    )}
+
+                    <div className="min-w-0">
+                      <p className="truncate text-lg font-bold text-foreground">{j.title}</p>
+                      <p className="truncate text-xs font-medium text-foreground/65">{j.organizationName || user?.university || "University"}</p>
+                    </div>
                   </div>
+
+                  <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${j.status === "OPEN" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                    {j.status === "OPEN" ? "Open" : "Closed"}
+                  </span>
                 </div>
-                <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${j.status === "OPEN" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
-                  {j.status === "OPEN" ? "Open" : "Closed"}
-                </span>
-                <button type="button" onClick={() => { if (window.confirm("Delete this job posting?")) removeJob(j.id); }}
-                  className="shrink-0 rounded-full border border-red-200 px-3 py-1.5 text-xs font-medium text-red-500 hover:bg-red-50 transition">
-                  Delete
-                </button>
+
+                <div className="mb-3 flex flex-wrap gap-1.5">
+                  <span className="rounded-full border border-foreground/15 bg-white/60 px-2.5 py-1 text-xs font-medium text-foreground">{j.workplaceType ? String(j.workplaceType).replace("_", "-") : "On-site"}</span>
+                  <span className="rounded-full border border-foreground/15 bg-white/60 px-2.5 py-1 text-xs font-medium text-foreground">{j.jobType || "N/A"}</span>
+                </div>
+
+                <p className="mb-4 line-clamp-2 text-sm leading-6 text-foreground/75">
+                  {j.description || "No description added for this posting yet."}
+                </p>
+
+                <div className="mb-4 grid gap-2 text-xs text-foreground/65 sm:grid-cols-2">
+                  <p className="flex items-center gap-1.5"><MapPin size={12} />{j.location || "Location not specified"}</p>
+                  <p className="flex items-center gap-1.5"><CalendarDays size={12} />Posted {formatPostedDate(j.createdAt)}</p>
+                </div>
+
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/hr/applications?jobType=${encodeURIComponent(j.jobType || "")}`)}
+                    className="rounded-full border border-border px-3.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-background"
+                  >
+                    View Applications
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { if (window.confirm("Delete this job posting?")) removeJob(j.id); }}
+                    className="rounded-full border border-red-200 px-3.5 py-1.5 text-xs font-medium text-red-500 transition hover:bg-red-50"
+                  >
+                    Delete
+                  </button>
+                </div>
               </motion.div>
             ))}
             {filteredAndSortedJobs.length === 0 && (
-              <div className="rounded-2xl bg-white p-8 text-center shadow-sm">
+              <div className="rounded-2xl bg-white p-8 text-center shadow-sm md:col-span-2">
                 <p className="text-sm text-muted-foreground">No jobs found for selected role filter.</p>
               </div>
             )}

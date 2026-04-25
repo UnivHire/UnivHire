@@ -1,3 +1,4 @@
+import { API_BASE } from "../../lib/api";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Briefcase, Mail, MapPin, Phone, User, X } from "lucide-react";
@@ -27,7 +28,7 @@ export function HRApplicationDetailPage() {
       }
 
       try {
-        const response = await fetch(`http://localhost:5000/api/applications/${id}`, {
+        const response = await fetch(`${API_BASE}/api/applications/${id}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const data = await response.json();
@@ -47,8 +48,8 @@ export function HRApplicationDetailPage() {
     const url = application?.resumeUrl;
     if (!url) return "";
     if (url.startsWith("http://") || url.startsWith("https://")) return url;
-    if (url.startsWith("/uploads/")) return `http://localhost:5000${url}`;
-    if (url.startsWith("uploads/")) return `http://localhost:5000/${url}`;
+    if (url.startsWith("/uploads/")) return `${API_BASE}${url}`;
+    if (url.startsWith("uploads/")) return `${API_BASE}/${url}`;
     // Legacy placeholder values like "pdf:file.pdf" are not openable URLs.
     return "";
   }, [application?.resumeUrl]);
@@ -112,7 +113,7 @@ export function HRApplicationDetailPage() {
 
         {resumeModalOpen && resumeHref && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/55 p-4" role="dialog" aria-modal="true" aria-label="Resume PDF preview">
-            <div className="h-[88vh] w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="h-[88vh] w-full max-w-[96vw] overflow-hidden rounded-2xl bg-white shadow-2xl">
               <div className="flex items-center justify-between border-b border-border px-4 py-3">
                 <p className="text-sm font-semibold text-foreground">Resume Preview</p>
                 <button
