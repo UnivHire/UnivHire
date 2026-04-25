@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { SmartNavbar } from "../../components/SmartNavbar";
 import { useAuthStore } from "../../store/authStore";
+import { API_BASE } from "../../lib/api";
 
 type Section =
   | "profile"
@@ -45,6 +46,30 @@ export function HRSettingsPage() {
     bio: "Dedicated HR professional passionate about connecting talented individuals with the right opportunities.",
   });
 
+  // Load profile from backend on mount
+  useEffect(() => {
+    if (!token) return;
+    fetch(`${API_BASE}/api/users/profile`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.email) {
+          setProfile({
+            name: data.name || "",
+            email: data.email || "",
+            phone: data.phone || "",
+            designation: data.designation || "HR Manager",
+            department: data.department || "Human Resources",
+            university: data.university || "",
+            location: data.location || "India",
+            website: data.website || "",
+            bio: data.bio || "",
+          });
+        }
+      })
+      .catch(console.error);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
   /* ── Notification state ─────────────── */
   const [notif, setNotif] = useState({
     newApplication: true,
@@ -73,6 +98,33 @@ export function HRSettingsPage() {
     setTimeout(() => setToast(""), 3500);
   };
 
+  const saveProfile = async () => {
+    if (!token) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/users/profile`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          name: profile.name,
+          phone: profile.phone,
+          designation: profile.designation,
+          department: profile.department,
+          university: profile.university,
+          location: profile.location,
+          website: profile.website,
+          bio: profile.bio,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      showToast("Profile saved!");
+    } catch {
+      showToast("Failed to save profile.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const fakeSave = async (msg: string) => {
     setSaving(true);
     await new Promise((r) => setTimeout(r, 700));
@@ -85,8 +137,22 @@ export function HRSettingsPage() {
     if (!pw.current) return setPwErr("Enter your current password.");
     if (pw.next.length < 8) return setPwErr("New password must be at least 8 characters.");
     if (pw.next !== pw.confirm) return setPwErr("Passwords do not match.");
-    await fakeSave("Password updated successfully!");
-    setPw({ current: "", next: "", confirm: "" });
+    setSaving(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/users/change-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ currentPassword: pw.current, newPassword: pw.next }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      showToast("Password updated successfully!");
+      setPw({ current: "", next: "", confirm: "" });
+    } catch (err: any) {
+      setPwErr(err.message || "Failed to update password.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDeleteAccount = () => {
@@ -151,7 +217,7 @@ export function HRSettingsPage() {
               />
             </div>
 
-            <SaveBtn onClick={() => fakeSave("Profile saved!")} saving={saving} />
+            <SaveBtn onClick={saveProfile} saving={saving} />
           </div>
         );
 
@@ -396,7 +462,7 @@ export function HRSettingsPage() {
     <div className="min-h-screen bg-background">
       <SmartNavbar />
 
-      <div className="mx-auto max-w-7xl px-6 py-10 md:px-10">
+      <div className="w-full px-6 py-10 md:px-10">
         {/* Back */}
         <button
           type="button"

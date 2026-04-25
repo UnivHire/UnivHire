@@ -26,7 +26,7 @@ export function CandidateNotificationsPage() {
     <div className="min-h-screen bg-background">
       <SmartNavbar />
 
-      <div className="mx-auto max-w-5xl px-6 py-10 md:px-10">
+      <div className="w-full px-6 py-10 md:px-10">
         <button
           type="button"
           onClick={() => navigate("/dashboard")}

@@ -1,3 +1,4 @@
+import { API_BASE } from "../../lib/api";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -56,7 +57,7 @@ export function CandidateDashboardPage() {
   }, [syncFromAuth, user]);
 
   useEffect(() => {
-    fetch("http://localhost:5000/api/jobs")
+    fetch(`${API_BASE}/api/jobs`)
       .then((res) => res.json())
       .then((data) => {
         setFetchedJobs(Array.isArray(data) ? data.map(normalizeCandidateJob) : []);
@@ -116,7 +117,7 @@ export function CandidateDashboardPage() {
     <div className="min-h-screen bg-background">
       <SmartNavbar />
 
-      <div className="mx-auto max-w-7xl px-6 py-10 md:px-10">
+      <div className="w-full px-6 py-10 md:px-10">
         <motion.section
           className="mb-8 overflow-hidden rounded-[28px] bg-foreground px-6 py-7 text-white shadow-sm md:px-8"
           initial={{ opacity: 0, y: 12 }}

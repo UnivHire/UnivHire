@@ -17,17 +17,30 @@ import { SmartNavbar } from "../../components/SmartNavbar";
 import { CandidatePageHeader } from "../../components/candidate/CandidatePageHeader";
 import { useAuthStore } from "../../store/authStore";
 import { useCandidateStore } from "../../store/candidateStore";
+import { API_BASE } from "../../lib/api";
 
 export function CandidateProfilePage() {
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  const { user, token } = useAuthStore();
   const { profile, updateProfile, syncFromAuth } = useCandidateStore();
   const [draft, setDraft] = useState(profile);
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     syncFromAuth(user || null);
-  }, [syncFromAuth, user]);
+    if (!token) return;
+    fetch(`${API_BASE}/api/users/profile`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.email) {
+          updateProfile(data);
+          setDraft(data);
+        }
+      })
+      .catch(console.error);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [syncFromAuth, user, token]);
 
   useEffect(() => {
     setDraft(profile);
@@ -44,17 +57,32 @@ export function CandidateProfilePage() {
     [draft.name]
   );
 
-  const saveChanges = () => {
-    updateProfile(draft);
-    setSaved(true);
-    window.setTimeout(() => setSaved(false), 2500);
+  const saveChanges = async () => {
+    if (!token) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/users/profile`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(draft),
+      });
+      if (res.ok) {
+        updateProfile(draft);
+        setSaved(true);
+        window.setTimeout(() => setSaved(false), 2500);
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
     <div className="min-h-screen bg-background">
       <SmartNavbar />
 
-      <div className="mx-auto max-w-7xl px-6 py-10 md:px-10">
+      <div className="w-full px-6 py-10 md:px-10">
         <button
           type="button"
           onClick={() => navigate("/dashboard")}

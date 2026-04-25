@@ -1,3 +1,4 @@
+import { API_BASE } from "../../lib/api";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -21,25 +22,39 @@ const SENIORITY = [
   { v: "EXECUTIVE", l: "Executive" },
 ];
 const JOB_FUNCTIONS = [
-  "Administrative","Education","Research","Engineering","Finance",
-  "Human Resources","Information Technology","Management","Marketing","Operations","Other",
+  "Administrative", "Education", "Research", "Engineering", "Finance",
+  "Human Resources", "Information Technology", "Management", "Marketing", "Operations", "Other",
 ];
 const INDUSTRIES = [
-  "Higher Education","Education Administration Programs","Primary/Secondary Education",
-  "Government Administration","Non-profit Organizations","Research Services",
-  "Information Technology","Healthcare","Other",
+  "Higher Education", "Education Administration Programs", "Primary/Secondary Education",
+  "Government Administration", "Non-profit Organizations", "Research Services",
+  "Information Technology", "Healthcare", "Other",
 ];
 const RECOMMENDED_SKILLS = [
-  "Microsoft Office","Microsoft Excel","Microsoft Outlook","Microsoft PowerPoint",
-  "Communication","Office Software","Phone Etiquette","Inventory Control",
-  "Office Equipment","Control System","Leadership","Problem Solving",
-  "Teamwork","Time Management","Research","Data Analysis",
+  "Microsoft Office", "Microsoft Excel", "Microsoft Outlook", "Microsoft PowerPoint",
+  "Communication", "Office Software", "Phone Etiquette", "Inventory Control",
+  "Office Equipment", "Control System", "Leadership", "Problem Solving",
+  "Teamwork", "Time Management", "Research", "Data Analysis",
 ];
 const SCREENING_OPTIONS = [
-  "Background Check","Driver's License","Drug Test","Education",
-  "Industry Experience","Language","Hybrid Work","Remote Work",
-  "Onsite Work","Work Experience","Work Authorization","Visa Status","Urgent Hiring Need",
+  "Background Check", "Driver's License", "Drug Test", "Education",
+  "Industry Experience", "Language", "Hybrid Work", "Remote Work",
+  "Onsite Work", "Work Experience", "Work Authorization", "Visa Status", "Urgent Hiring Need",
 ];
+
+const CARD_THEME_OPTIONS = ["peach", "mint", "lavender", "sky", "pink", "cream"] as const;
+
+function getCardThemeClass(theme: string) {
+  const map: Record<string, string> = {
+    peach: "card-peach",
+    mint: "card-mint",
+    lavender: "card-lavender",
+    sky: "card-sky",
+    pink: "card-pink",
+    cream: "card-cream",
+  };
+  return map[(theme || "").toLowerCase()] || "card-peach";
+}
 
 /* ─── Types ──────────────────────────────────────────────── */
 interface FormState {
@@ -53,12 +68,12 @@ interface FormState {
   screeningQuestions: { type: string; mustHave: boolean }[];
 }
 const INIT: FormState = {
-  title:"", universityName:"", location:"",
-  workplaceType:"ON_SITE", employmentType:"", seniorityLevel:"NOT_APPLICABLE",
-  jobFunctions:[], industries:[],
-  description:"", skills:[], skillInput:"", experienceYears:0,
-  applicantMode:"email", applicantEmail:"", requireResume:true, externalUrl:"",
-  screeningQuestions:[],
+  title: "", universityName: "", location: "",
+  workplaceType: "ON_SITE", employmentType: "", seniorityLevel: "NOT_APPLICABLE",
+  jobFunctions: [], industries: [],
+  description: "", skills: [], skillInput: "", experienceYears: 0,
+  applicantMode: "email", applicantEmail: "", requireResume: true, externalUrl: "",
+  screeningQuestions: [],
 };
 
 /* ─── Shared input style ─────────────────────────────────── */
@@ -71,6 +86,8 @@ export function PostJobPage() {
   const [step, setStep] = useState(1);
   const [form, setForm] = useState<FormState>({ ...INIT, universityName: user?.university || "" });
   const [logoPreview, setLogoPreview] = useState("");
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [cardTheme, setCardTheme] = useState<(typeof CARD_THEME_OPTIONS)[number]>("peach");
   const [isPending, setIsPending] = useState(false);
   const [errorStr, setErrorStr] = useState("");
   const [success, setSuccess] = useState(false);
@@ -82,10 +99,11 @@ export function PostJobPage() {
   const handleLogo = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]; if (!f) return;
     if (logoPreview.startsWith("blob:")) URL.revokeObjectURL(logoPreview);
+    setLogoFile(f);
     setLogoPreview(URL.createObjectURL(f));
   };
 
-  const toggleArr = (key: "jobFunctions"|"industries"|"skills", val: string, max?: number) => {
+  const toggleArr = (key: "jobFunctions" | "industries" | "skills", val: string, max?: number) => {
     const cur = form[key] as string[];
     if (cur.includes(val)) { set(key, cur.filter(x => x !== val) as any); return; }
     if (max && cur.length >= max) return;
@@ -115,13 +133,13 @@ export function PostJobPage() {
   const canNext2 =
     form.description.trim().length > 0 &&
     form.skills.length > 0 && (
-    form.applicantMode === "email" ? !!form.applicantEmail : !!form.externalUrl
-  );
+      form.applicantMode === "email" ? !!form.applicantEmail : !!form.externalUrl
+    );
 
   const handleSubmit = async () => {
     setIsPending(true); setErrorStr("");
     try {
-      const res = await fetch("http://localhost:5000/api/jobs", {
+      const res = await fetch(`${API_BASE}/api/jobs`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
@@ -138,9 +156,29 @@ export function PostJobPage() {
           applicantEmail: form.applicantEmail,
           requireResume: form.requireResume,
           externalUrl: form.externalUrl,
+          cardTheme,
         }),
       });
-      if (!res.ok) { const d = await res.json(); throw new Error(d.error || "Failed"); }
+
+      const created = await res.json();
+      if (!res.ok) { throw new Error(created.error || "Failed"); }
+
+      if (logoFile && created?.id) {
+        const logoForm = new FormData();
+        logoForm.append("logo", logoFile);
+
+        const uploadRes = await fetch(`${API_BASE}/api/jobs/${created.id}/logo`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: logoForm,
+        });
+
+        if (!uploadRes.ok) {
+          const d = await uploadRes.json().catch(() => ({}));
+          throw new Error(d.error || "Job created, but logo upload failed");
+        }
+      }
+
       setSuccess(true);
     } catch (err: any) { setErrorStr(err.message); }
     finally { setIsPending(false); }
@@ -151,13 +189,13 @@ export function PostJobPage() {
 
   if (success) return (
     <div className="min-h-screen bg-background"><SmartNavbar />
-      <div className="mx-auto max-w-xl px-6 py-20">
-        <motion.div className="rounded-2xl bg-white p-10 text-center shadow-sm" initial={{ opacity:0, scale:0.95 }} animate={{ opacity:1, scale:1 }}>
+      <div className="w-full px-6 py-20 md:px-10">
+        <motion.div className="rounded-2xl bg-white p-10 text-center shadow-sm" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
           <CheckCircle2 size={52} className="mx-auto mb-4 text-emerald-500" />
           <h2 className="mb-2 text-xl font-bold">Job Posted Successfully!</h2>
           <p className="mb-6 text-sm text-muted-foreground">Your posting is live and will appear to candidates after review.</p>
           <div className="flex gap-3 justify-center">
-            <button onClick={() => { setSuccess(false); setStep(1); setForm({...INIT, universityName: user?.university||""}); setLogoPreview(""); }} className="rounded-full border border-border px-5 py-2.5 text-sm font-medium hover:bg-background transition">Post Another</button>
+            <button onClick={() => { setSuccess(false); setStep(1); setForm({ ...INIT, universityName: user?.university || "" }); setLogoPreview(""); setLogoFile(null); setCardTheme("peach"); }} className="rounded-full border border-border px-5 py-2.5 text-sm font-medium hover:bg-background transition">Post Another</button>
             <button onClick={() => navigate("/hr/jobs")} className="rounded-full bg-foreground px-5 py-2.5 text-sm font-semibold text-white hover:opacity-80 transition">View My Jobs</button>
           </div>
         </motion.div>
@@ -168,7 +206,7 @@ export function PostJobPage() {
   return (
     <div className="min-h-screen bg-background">
       <SmartNavbar />
-      <div className="mx-auto max-w-5xl px-6 py-10 md:px-10">
+      <div className="w-full px-6 py-10 md:px-10">
         <button type="button" onClick={() => navigate("/hr/dashboard")} className="mb-6 flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition">
           <ArrowLeft size={15} /> Back to dashboard
         </button>
@@ -184,8 +222,8 @@ export function PostJobPage() {
               <div key={s} className="flex items-center flex-1 last:flex-none">
                 <div className="flex flex-col items-center gap-1">
                   <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold transition
-                    ${done ? "bg-emerald-500 text-white" : active ? "bg-foreground text-white" : "bg-border text-muted-foreground"}`}>
-                    {done ? <CheckCircle2 size={16}/> : n}
+                    ${done ? "bg-emerald-500 text-white" : active ? "bg-secondary text-secondary-foreground" : "bg-border text-muted-foreground"}`}>
+                    {done ? <CheckCircle2 size={16} /> : n}
                   </div>
                   <span className={`text-[11px] font-medium whitespace-nowrap ${active ? "text-foreground" : "text-muted-foreground"}`}>{s}</span>
                 </div>
@@ -198,7 +236,7 @@ export function PostJobPage() {
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
           {/* ── FORM AREA ── */}
           <AnimatePresence mode="wait">
-            <motion.div key={step} initial={{ opacity:0, x:24 }} animate={{ opacity:1, x:0 }} exit={{ opacity:0, x:-24 }} transition={{ duration:0.2 }}
+            <motion.div key={step} initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} transition={{ duration: 0.2 }}
               className="rounded-2xl bg-white p-8 shadow-sm">
 
               {/* ════ STEP 1 ════ */}
@@ -208,29 +246,48 @@ export function PostJobPage() {
 
                   <div className="grid grid-cols-2 gap-4">
                     <PField label="Company / University" required>
-                      <input value={form.universityName} onChange={e => set("universityName",e.target.value)} required placeholder="e.g. GLA University" className={inp}/>
+                      <input value={form.universityName} onChange={e => set("universityName", e.target.value)} required placeholder="e.g. GLA University" className={inp} />
                     </PField>
                     <PField label="Job title" required>
-                      <input value={form.title} onChange={e => set("title",e.target.value)} required placeholder="e.g. Office Assistant" className={inp}/>
+                      <input value={form.title} onChange={e => set("title", e.target.value)} required placeholder="e.g. Office Assistant" className={inp} />
                     </PField>
                   </div>
 
                   <PField label="University logo (image)">
-                    <input type="file" accept="image/*" onChange={handleLogo} className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground file:mr-3 file:rounded-lg file:border-0 file:bg-foreground file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white"/>
+                    <input type="file" accept="image/*" onChange={handleLogo} className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground file:mr-3 file:rounded-lg file:border-0 file:bg-secondary file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-secondary-foreground" />
+                  </PField>
+
+                  <PField label="Card color theme">
+                    <div className="flex flex-wrap gap-2">
+                      {CARD_THEME_OPTIONS.map((theme) => {
+                        const active = cardTheme === theme;
+                        return (
+                          <button
+                            key={theme}
+                            type="button"
+                            onClick={() => setCardTheme(theme)}
+                            className={`${getCardThemeClass(theme)} rounded-full border px-3 py-1.5 text-xs font-semibold capitalize transition ${active ? "border-foreground ring-2 ring-foreground/20" : "border-border"
+                              }`}
+                          >
+                            {theme}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </PField>
 
                   <PField label="Job location" required>
-                    <input value={form.location} onChange={e => set("location",e.target.value)} required placeholder="e.g. Mathura, Uttar Pradesh, India" className={inp}/>
+                    <input value={form.location} onChange={e => set("location", e.target.value)} required placeholder="e.g. Mathura, Uttar Pradesh, India" className={inp} />
                   </PField>
 
                   <div className="grid grid-cols-2 gap-4">
                     <PField label="Workplace type" required>
-                      <select value={form.workplaceType} onChange={e => set("workplaceType",e.target.value)} className={inp}>
+                      <select value={form.workplaceType} onChange={e => set("workplaceType", e.target.value)} className={inp}>
                         {WORKPLACE_TYPES.map(w => <option key={w.v} value={w.v}>{w.l}</option>)}
                       </select>
                     </PField>
                     <PField label="Employment type" required>
-                      <select value={form.employmentType} onChange={e => set("employmentType",e.target.value)} required className={inp}>
+                      <select value={form.employmentType} onChange={e => set("employmentType", e.target.value)} required className={inp}>
                         <option value="">Select…</option>
                         {EMPLOYMENT_TYPES.map(t => <option key={t.v} value={t.v}>{t.l}</option>)}
                       </select>
@@ -238,7 +295,7 @@ export function PostJobPage() {
                   </div>
 
                   <PField label="Seniority level">
-                    <select value={form.seniorityLevel} onChange={e => set("seniorityLevel",e.target.value)} className={inp}>
+                    <select value={form.seniorityLevel} onChange={e => set("seniorityLevel", e.target.value)} className={inp}>
                       {SENIORITY.map(s => <option key={s.v} value={s.v}>{s.l}</option>)}
                     </select>
                   </PField>
@@ -249,10 +306,10 @@ export function PostJobPage() {
                         const active = form.jobFunctions.includes(fn);
                         const disabled = !active && form.jobFunctions.length >= 3;
                         return (
-                          <button key={fn} type="button" disabled={disabled} onClick={() => toggleArr("jobFunctions",fn,3)}
+                          <button key={fn} type="button" disabled={disabled} onClick={() => toggleArr("jobFunctions", fn, 3)}
                             className={`rounded-full border px-3 py-1 text-xs font-medium transition flex items-center gap-1
-                              ${active?"bg-foreground text-white border-foreground":disabled?"border-border text-muted-foreground opacity-40 cursor-not-allowed":"border-border text-foreground hover:border-foreground/60"}`}>
-                            {active?<X size={10}/>:<Plus size={10}/>}{fn}
+                              ${active ? "bg-secondary text-secondary-foreground border-secondary" : disabled ? "border-border text-muted-foreground opacity-40 cursor-not-allowed" : "border-border text-foreground hover:border-foreground/60"}`}>
+                            {active ? <X size={10} /> : <Plus size={10} />}{fn}
                           </button>
                         );
                       })}
@@ -264,10 +321,10 @@ export function PostJobPage() {
                       {INDUSTRIES.map(ind => {
                         const active = form.industries.includes(ind);
                         return (
-                          <button key={ind} type="button" onClick={() => toggleArr("industries",ind)}
+                          <button key={ind} type="button" onClick={() => toggleArr("industries", ind)}
                             className={`rounded-full border px-3 py-1 text-xs font-medium transition flex items-center gap-1
-                              ${active?"bg-foreground text-white border-foreground":"border-border text-foreground hover:border-foreground/60"}`}>
-                            {active?<X size={10}/>:<Plus size={10}/>}{ind}
+                              ${active ? "bg-secondary text-secondary-foreground border-secondary" : "border-border text-foreground hover:border-foreground/60"}`}>
+                            {active ? <X size={10} /> : <Plus size={10} />}{ind}
                           </button>
                         );
                       })}
@@ -276,8 +333,8 @@ export function PostJobPage() {
 
                   <div className="flex justify-end mt-2">
                     <button type="button" disabled={!canNext1} onClick={() => setStep(2)}
-                      className="flex items-center gap-2 rounded-full bg-foreground px-6 py-2.5 text-sm font-bold text-white hover:opacity-80 disabled:opacity-40 transition">
-                      Next <ArrowRight size={15}/>
+                      className="flex items-center gap-2 rounded-full bg-secondary px-6 py-2.5 text-sm font-bold text-secondary-foreground hover:opacity-80 disabled:opacity-40 transition">
+                      Next <ArrowRight size={15} />
                     </button>
                   </div>
                 </div>
@@ -289,21 +346,21 @@ export function PostJobPage() {
                   <h2 className="text-lg font-bold text-foreground">Step 2: Description, Skills & Applicant Settings</h2>
 
                   <PField label="Job description" required>
-                    <textarea value={form.description} onChange={e => set("description",e.target.value)} rows={6}
-                      placeholder="Describe the role, responsibilities, qualifications…" className={inp+" resize-none"}/>
+                    <textarea value={form.description} onChange={e => set("description", e.target.value)} rows={6}
+                      placeholder="Describe the role, responsibilities, qualifications…" className={inp + " resize-none"} />
                   </PField>
 
                   <PField label="Minimum years of experience">
-                    <input type="number" min={0} max={30} value={form.experienceYears} onChange={e => set("experienceYears",Number(e.target.value))} className={inp}/>
+                    <input type="number" min={0} max={30} value={form.experienceYears} onChange={e => set("experienceYears", Number(e.target.value))} className={inp} />
                   </PField>
 
                   {/* Skills */}
                   <PField label={`Add skills (up to 10) — ${form.skills.length}/10`}>
                     <div className="flex gap-2 mb-2">
-                      <input value={form.skillInput} onChange={e => set("skillInput",e.target.value)}
-                        onKeyDown={e => { if(e.key==="Enter"){ e.preventDefault(); addSkillFromInput(); }}}
-                        placeholder="Type a skill and press Enter or Add" className={inp}/>
-                      <button type="button" onClick={addSkillFromInput} disabled={form.skills.length>=10}
+                      <input value={form.skillInput} onChange={e => set("skillInput", e.target.value)}
+                        onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addSkillFromInput(); } }}
+                        placeholder="Type a skill and press Enter or Add" className={inp} />
+                      <button type="button" onClick={addSkillFromInput} disabled={form.skills.length >= 10}
                         className="shrink-0 rounded-xl border border-border px-4 text-sm font-medium hover:bg-background disabled:opacity-40 transition">Add</button>
                     </div>
                     <p className="text-[11px] text-muted-foreground mb-2">Recommended:</p>
@@ -312,10 +369,10 @@ export function PostJobPage() {
                         const active = form.skills.includes(sk);
                         const disabled = !active && form.skills.length >= 10;
                         return (
-                          <button key={sk} type="button" disabled={disabled} onClick={() => toggleArr("skills",sk,10)}
+                          <button key={sk} type="button" disabled={disabled} onClick={() => toggleArr("skills", sk, 10)}
                             className={`rounded-full border px-2.5 py-0.5 text-xs font-medium transition flex items-center gap-1
-                              ${active?"bg-foreground text-white border-foreground":disabled?"opacity-40 cursor-not-allowed border-border text-muted-foreground":"border-border text-foreground hover:border-foreground/60"}`}>
-                            {active?<X size={9}/>:<Plus size={9}/>}{sk}
+                              ${active ? "bg-secondary text-secondary-foreground border-secondary" : disabled ? "opacity-40 cursor-not-allowed border-border text-muted-foreground" : "border-border text-foreground hover:border-foreground/60"}`}>
+                            {active ? <X size={9} /> : <Plus size={9} />}{sk}
                           </button>
                         );
                       })}
@@ -327,19 +384,19 @@ export function PostJobPage() {
                     <p className="text-sm font-semibold text-foreground">How would you like to receive your applicants?</p>
 
                     <label className="flex items-start gap-3 cursor-pointer">
-                      <input type="radio" checked={form.applicantMode==="email"} onChange={() => set("applicantMode","email")} className="mt-0.5 accent-foreground"/>
+                      <input type="radio" checked={form.applicantMode === "email"} onChange={() => set("applicantMode", "email")} className="mt-0.5 accent-foreground" />
                       <div className="grid gap-1 flex-1">
                         <div className="flex items-center gap-2">
-                          <Mail size={14} className="text-muted-foreground"/>
+                          <Mail size={14} className="text-muted-foreground" />
                           <span className="text-sm font-medium text-foreground">Let candidates apply via platform</span>
                         </div>
                         <p className="text-xs text-muted-foreground">You get notified by email when someone applies.</p>
-                        {form.applicantMode==="email" && (
+                        {form.applicantMode === "email" && (
                           <div className="mt-2 grid gap-2">
-                            <input value={form.applicantEmail} onChange={e => set("applicantEmail",e.target.value)}
-                              placeholder="e.g. career@university.ac.in" type="email" className={inp}/>
+                            <input value={form.applicantEmail} onChange={e => set("applicantEmail", e.target.value)}
+                              placeholder="e.g. career@university.ac.in" type="email" className={inp} />
                             <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
-                              <input type="checkbox" checked={form.requireResume} onChange={e => set("requireResume",e.target.checked)} className="accent-foreground"/>
+                              <input type="checkbox" checked={form.requireResume} onChange={e => set("requireResume", e.target.checked)} className="accent-foreground" />
                               Require applicants to attach a resume
                             </label>
                           </div>
@@ -348,15 +405,15 @@ export function PostJobPage() {
                     </label>
 
                     <label className="flex items-start gap-3 cursor-pointer">
-                      <input type="radio" checked={form.applicantMode==="external"} onChange={() => set("applicantMode","external")} className="mt-0.5 accent-foreground"/>
+                      <input type="radio" checked={form.applicantMode === "external"} onChange={() => set("applicantMode", "external")} className="mt-0.5 accent-foreground" />
                       <div className="grid gap-1 flex-1">
                         <div className="flex items-center gap-2">
-                          <ExternalLink size={14} className="text-muted-foreground"/>
+                          <ExternalLink size={14} className="text-muted-foreground" />
                           <span className="text-sm font-medium text-foreground">Direct applicants to an external site</span>
                         </div>
-                        {form.applicantMode==="external" && (
-                          <input value={form.externalUrl} onChange={e => set("externalUrl",e.target.value)}
-                            placeholder="https://your-career-site.com/apply" type="url" className={inp+" mt-2"}/>
+                        {form.applicantMode === "external" && (
+                          <input value={form.externalUrl} onChange={e => set("externalUrl", e.target.value)}
+                            placeholder="https://your-career-site.com/apply" type="url" className={inp + " mt-2"} />
                         )}
                       </div>
                     </label>
@@ -364,11 +421,11 @@ export function PostJobPage() {
 
                   <div className="flex justify-between mt-2">
                     <button type="button" onClick={() => setStep(1)} className="flex items-center gap-2 rounded-full border border-border px-6 py-2.5 text-sm font-medium hover:bg-background transition">
-                      <ArrowLeft size={15}/> Back
+                      <ArrowLeft size={15} /> Back
                     </button>
                     <button type="button" disabled={!canNext2} onClick={() => setStep(3)}
-                      className="flex items-center gap-2 rounded-full bg-foreground px-6 py-2.5 text-sm font-bold text-white hover:opacity-80 disabled:opacity-40 transition">
-                      Next <ArrowRight size={15}/>
+                      className="flex items-center gap-2 rounded-full bg-secondary px-6 py-2.5 text-sm font-bold text-secondary-foreground hover:opacity-80 disabled:opacity-40 transition">
+                      Next <ArrowRight size={15} />
                     </button>
                   </div>
                 </div>
@@ -384,12 +441,12 @@ export function PostJobPage() {
 
                   <div className="flex flex-wrap gap-2">
                     {SCREENING_OPTIONS.map(opt => {
-                      const active = !!form.screeningQuestions.find(q => q.type===opt);
+                      const active = !!form.screeningQuestions.find(q => q.type === opt);
                       return (
                         <button key={opt} type="button" onClick={() => toggleScreening(opt)}
                           className={`rounded-full border px-3 py-1.5 text-xs font-medium transition flex items-center gap-1
-                            ${active?"bg-foreground text-white border-foreground":"border-border text-foreground hover:border-foreground/60"}`}>
-                          {active?<X size={10}/>:<Plus size={10}/>}{opt}
+                            ${active ? "bg-secondary text-secondary-foreground border-secondary" : "border-border text-foreground hover:border-foreground/60"}`}>
+                          {active ? <X size={10} /> : <Plus size={10} />}{opt}
                         </button>
                       );
                     })}
@@ -403,8 +460,8 @@ export function PostJobPage() {
                           <span className="text-sm font-medium text-foreground">{q.type}</span>
                           <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
                             <input type="checkbox" checked={q.mustHave}
-                              onChange={e => set("screeningQuestions", form.screeningQuestions.map(x => x.type===q.type?{...x,mustHave:e.target.checked}:x))}
-                              className="accent-foreground"/>
+                              onChange={e => set("screeningQuestions", form.screeningQuestions.map(x => x.type === q.type ? { ...x, mustHave: e.target.checked } : x))}
+                              className="accent-foreground" />
                             Must-have
                           </label>
                         </div>
@@ -416,10 +473,10 @@ export function PostJobPage() {
 
                   <div className="flex justify-between mt-2">
                     <button type="button" onClick={() => setStep(2)} className="flex items-center gap-2 rounded-full border border-border px-6 py-2.5 text-sm font-medium hover:bg-background transition">
-                      <ArrowLeft size={15}/> Back
+                      <ArrowLeft size={15} /> Back
                     </button>
                     <button type="button" onClick={handleSubmit} disabled={isPending || form.screeningQuestions.length === 0}
-                      className="rounded-full bg-foreground px-8 py-2.5 text-sm font-bold text-white hover:opacity-80 disabled:opacity-60 transition">
+                      className="rounded-full bg-secondary px-8 py-2.5 text-sm font-bold text-secondary-foreground hover:opacity-80 disabled:opacity-60 transition">
                       {isPending ? "Posting…" : "Submit Job Posting →"}
                     </button>
                   </div>
@@ -431,36 +488,36 @@ export function PostJobPage() {
           {/* ── LIVE PREVIEW (sticky) ── */}
           <div className="rounded-2xl bg-white p-5 shadow-sm h-fit sticky top-6">
             <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Live Preview</p>
-            <article className="rounded-xl border border-border bg-background p-4">
+            <article className={`${getCardThemeClass(cardTheme)} rounded-xl border border-border p-4`}>
               <div className="mb-3 flex items-start gap-3">
                 {logoPreview
-                  ? <img src={logoPreview} alt="logo" className="h-11 w-11 rounded-lg object-cover border border-border shrink-0"/>
-                  : <div className="flex h-11 w-11 items-center justify-center rounded-lg border border-dashed border-border text-muted-foreground shrink-0"><ImageIcon size={15}/></div>}
+                  ? <img src={logoPreview} alt="logo" className="h-11 w-11 rounded-lg object-cover border border-border shrink-0" />
+                  : <div className="flex h-11 w-11 items-center justify-center rounded-lg border border-dashed border-border text-muted-foreground shrink-0"><ImageIcon size={15} /></div>}
                 <div>
-                  <p className="text-[11px] text-muted-foreground">{form.universityName||"University name"}</p>
-                  <h3 className="text-sm font-bold text-foreground">{form.title||"Job title preview"}</h3>
+                  <p className="text-[11px] text-muted-foreground">{form.universityName || "University name"}</p>
+                  <h3 className="text-sm font-bold text-foreground">{form.title || "Job title preview"}</h3>
                 </div>
               </div>
 
               <div className="mb-2 flex flex-wrap gap-1">
-                {form.employmentType && <Tag>{EMPLOYMENT_TYPES.find(t=>t.v===form.employmentType)?.l||""}</Tag>}
-                {form.workplaceType && <Tag>{WORKPLACE_TYPES.find(w=>w.v===form.workplaceType)?.l||""}</Tag>}
+                {form.employmentType && <Tag>{EMPLOYMENT_TYPES.find(t => t.v === form.employmentType)?.l || ""}</Tag>}
+                {form.workplaceType && <Tag>{WORKPLACE_TYPES.find(w => w.v === form.workplaceType)?.l || ""}</Tag>}
                 <span className="rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 px-2 py-0.5 text-[11px] font-medium">Open</span>
               </div>
 
-              {form.location && <div className="mb-2 flex items-center gap-1 text-[11px] text-muted-foreground"><MapPin size={11}/>{form.location}</div>}
+              {form.location && <div className="mb-2 flex items-center gap-1 text-[11px] text-muted-foreground"><MapPin size={11} />{form.location}</div>}
 
-              {form.jobFunctions.length>0 && (
-                <div className="mb-2 flex flex-wrap gap-1">{form.jobFunctions.map(f=><Tag key={f}>{f}</Tag>)}</div>
+              {form.jobFunctions.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-1">{form.jobFunctions.map(f => <Tag key={f}>{f}</Tag>)}</div>
               )}
-              {form.skills.length>0 && (
-                <div className="mb-2 flex flex-wrap gap-1">{form.skills.map(s=><Tag key={s}>{s}</Tag>)}</div>
+              {form.skills.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-1">{form.skills.map(s => <Tag key={s}>{s}</Tag>)}</div>
               )}
 
               <p className="line-clamp-4 text-xs text-foreground/70">
-                {form.description||"Job description will appear here as you type."}
+                {form.description || "Job description will appear here as you type."}
               </p>
-              {form.experienceYears>0 && <p className="mt-2 text-[11px] text-muted-foreground">Min. {form.experienceYears} yr{form.experienceYears!==1?"s":""} exp.</p>}
+              {form.experienceYears > 0 && <p className="mt-2 text-[11px] text-muted-foreground">Min. {form.experienceYears} yr{form.experienceYears !== 1 ? "s" : ""} exp.</p>}
             </article>
           </div>
         </div>
@@ -469,10 +526,10 @@ export function PostJobPage() {
   );
 }
 
-function PField({ label, children, required }: { label:string; children:React.ReactNode; required?:boolean }) {
+function PField({ label, children, required }: { label: string; children: React.ReactNode; required?: boolean }) {
   return (
     <label className="grid gap-1.5">
-      <span className="text-xs font-semibold text-foreground/60">{label}{required&&<span className="text-red-400"> *</span>}</span>
+      <span className="text-xs font-semibold text-foreground/60">{label}{required && <span className="text-red-400"> *</span>}</span>
       {children}
     </label>
   );

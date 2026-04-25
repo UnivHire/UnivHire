@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { SmartNavbar } from "../../components/SmartNavbar";
 import { useAuthStore } from "../../store/authStore";
+import { API_BASE } from "../../lib/api";
 
 export function HRProfilePage() {
   const navigate = useNavigate();
@@ -15,6 +16,7 @@ export function HRProfilePage() {
   const [editingSection, setEditingSection] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
+  const [hrStats, setHrStats] = useState({ jobs: 0, applicants: 0, hires: 0, active: 0 });
 
   const [profileData, setProfileData] = useState({
     name: user?.name || "",
@@ -32,6 +34,56 @@ export function HRProfilePage() {
 
   const [draft, setDraft] = useState({ ...profileData });
 
+  // Load profile from backend on mount
+  useEffect(() => {
+    if (!token) return;
+    fetch(`${API_BASE}/api/users/profile`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.email) {
+          const loaded = {
+            name: data.name || "",
+            email: data.email || "",
+            phone: data.phone || "",
+            designation: data.designation || "HR Manager",
+            department: data.department || "Human Resources",
+            university: data.university || "",
+            location: data.location || "India",
+            website: data.website || "",
+            bio: data.bio || "",
+            linkedin: data.linkedin || "",
+            experience: data.experienceLevel || "5+ years",
+          };
+          setProfileData(loaded);
+          setDraft(loaded);
+        }
+      })
+      .catch(console.error);
+
+    // Load HR job stats
+    fetch(`${API_BASE}/api/applications`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.json())
+      .then((apps: any[]) => {
+        if (!Array.isArray(apps)) return;
+        const hires = apps.filter((a) => String(a.status).toUpperCase() === "HIRED").length;
+        setHrStats((prev) => ({ ...prev, applicants: apps.length, hires }));
+      })
+      .catch(console.error);
+
+    fetch(`${API_BASE}/api/jobs`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.json())
+      .then((allJobs: any[]) => {
+        if (!Array.isArray(allJobs)) return;
+        const mine = allJobs.filter((j) => j.hrId === user?.id || j.hr?.id === user?.id);
+        const active = mine.filter((j) => j.status === "OPEN").length;
+        setHrStats((prev) => ({ ...prev, jobs: mine.length, active }));
+      })
+      .catch(console.error);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
   const startEdit = (section: string) => {
     setDraft({ ...profileData });
     setEditingSection(section);
@@ -43,14 +95,37 @@ export function HRProfilePage() {
   };
 
   const saveEdit = async () => {
+    if (!token) return;
     setSaving(true);
-    // Simulate API call - in production, patch /api/users/me
-    await new Promise((r) => setTimeout(r, 800));
-    setProfileData({ ...draft });
-    setEditingSection(null);
-    setSaving(false);
-    setSuccessMsg("Profile updated successfully!");
-    setTimeout(() => setSuccessMsg(""), 3000);
+    try {
+      const res = await fetch(`${API_BASE}/api/users/profile`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          name: draft.name,
+          email: draft.email,
+          phone: draft.phone,
+          designation: draft.designation,
+          department: draft.department,
+          university: draft.university,
+          location: draft.location,
+          website: draft.website,
+          bio: draft.bio,
+          linkedin: draft.linkedin,
+          experienceLevel: draft.experience,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      setProfileData({ ...draft });
+      setEditingSection(null);
+      setSuccessMsg("Profile updated successfully!");
+      setTimeout(() => setSuccessMsg(""), 3000);
+    } catch (err) {
+      console.error(err);
+      setSuccessMsg("Failed to save profile.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const initials = profileData.name
@@ -61,17 +136,17 @@ export function HRProfilePage() {
     .slice(0, 2);
 
   const stats = [
-    { icon: <Briefcase size={18} />, label: "Jobs Posted", value: "—", color: "card-peach" },
-    { icon: <Users size={18} />, label: "Total Applicants", value: "—", color: "card-mint" },
-    { icon: <Award size={18} />, label: "Hires Made", value: "—", color: "card-lavender" },
-    { icon: <FileText size={18} />, label: "Active Listings", value: "—", color: "card-sky" },
+    { icon: <Briefcase size={18} />, label: "Jobs Posted", value: hrStats.jobs, color: "card-peach" },
+    { icon: <Users size={18} />, label: "Total Applicants", value: hrStats.applicants, color: "card-mint" },
+    { icon: <Award size={18} />, label: "Hires Made", value: hrStats.hires, color: "card-lavender" },
+    { icon: <FileText size={18} />, label: "Active Listings", value: hrStats.active, color: "card-sky" },
   ];
 
   return (
     <div className="min-h-screen bg-background">
       <SmartNavbar />
 
-      <div className="mx-auto max-w-7xl px-6 py-10 md:px-10">
+      <div className="w-full px-6 py-10 md:px-10">
         {/* Back */}
         <button
           type="button"

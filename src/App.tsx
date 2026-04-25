@@ -33,8 +33,8 @@ function RootRoute() {
     role === "candidate"
       ? "/dashboard"
       : role === "hr"
-      ? "/hr/dashboard"
-      : "/admin";
+        ? "/hr/dashboard"
+        : "/admin";
 
   return <Navigate to={destination} replace />;
 }

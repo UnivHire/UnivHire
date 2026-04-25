@@ -17,11 +17,36 @@ model User {
   passwordHash String
   name         String
   role         String        // 'CANDIDATE', 'HR', 'ADMIN'
-  university   String?       // Make sure optional
+  university   String?
+
+  // Extended profile fields (shared candidate + HR)
+  phone            String?
+  headline         String?
+  about            String?
+  resumeUrl        String?
+  portfolioUrl     String?
+  experienceLevel  String?
+  availability     String?
+  skills           String?   // comma-separated
+  preferredRole    String?
+  location         String?
+
+  // HR-specific profile fields
+  designation      String?
+  department       String?
+  website          String?
+  linkedin         String?
+  bio              String?
+
+  // Settings stored as JSON strings
+  notificationSettings String?
+  preferences          String?
+
   createdAt    DateTime      @default(now())
-  jobsPosted   Job[]         // Only if role == 'HR'
-  applications Application[] // Only if role == 'CANDIDATE'
+  jobsPosted   Job[]
+  applications Application[]
   savedJobs    SavedJob[]
+  invitesSent  Invite[]      @relation("InviteSender")
 }
 
 model Job {
@@ -33,44 +58,58 @@ model Job {
   description         String
   location            String
   jobType             String        // 'FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERNSHIP', 'TEMPORARY'
-  workplaceType       String        @default("ON_SITE") // 'ON_SITE', 'REMOTE', 'HYBRID'
-  seniorityLevel      String        @default("NOT_APPLICABLE") // 'NOT_APPLICABLE', 'INTERNSHIP', 'ENTRY', 'ASSOCIATE', 'MID_SENIOR', 'DIRECTOR', 'EXECUTIVE'
-  jobFunction         String        @default("") // comma-separated e.g. "Administrative,Education"
-  industry            String        @default("") // comma-separated e.g. "Higher Education"
+  workplaceType       String        @default("ON_SITE")
+  seniorityLevel      String        @default("NOT_APPLICABLE")
+  jobFunction         String        @default("")
+  industry            String        @default("")
   experienceYears     Int           @default(0)
-  requiredSkills      String        @default("") // comma-separated
-  screeningQuestions  String        @default("") // JSON array string
-  applicationMode     String        @default("PLATFORM") // 'PLATFORM', 'EXTERNAL'
+  requiredSkills      String        @default("")
+  screeningQuestions  String        @default("")
+  applicationMode     String        @default("PLATFORM")
   applicationEmail    String        @default("")
   requireResume       Boolean       @default(true)
   externalApplyUrl    String        @default("")
-  status              String        @default("OPEN") // 'OPEN', 'CLOSED'
+  status              String        @default("OPEN")
+  isVerified          Boolean       @default(false)
   createdAt           DateTime      @default(now())
   applications        Application[]
   savedBy             SavedJob[]
 }
 
 model Application {
-  id          String   @id @default(uuid())
-  jobId       String
-  job         Job      @relation(fields: [jobId], references: [id])
-  candidateId String
-  candidate   User     @relation(fields: [candidateId], references: [id])
-  candidatePhone String?
+  id               String   @id @default(uuid())
+  jobId            String
+  job              Job      @relation(fields: [jobId], references: [id])
+  candidateId      String
+  candidate        User     @relation(fields: [candidateId], references: [id])
+  candidatePhone   String?
   candidateAddress String?
-  currentLocation String?
-  resumeUrl   String?
-  status      String   @default("PENDING") // 'PENDING', 'REVIEWED', 'REJECTED', 'ACCEPTED'
-  appliedAt   DateTime @default(now())
+  currentLocation  String?
+  resumeUrl        String?
+  status           String   @default("PENDING")
+  appliedAt        DateTime @default(now())
 
-  @@unique([jobId, candidateId]) // A user can only apply once to a job
+  @@unique([jobId, candidateId])
 }
 
 model SavedJob {
   candidateId String
-  candidate   User   @relation(fields: [candidateId], references: [id])
+  candidate   User      @relation(fields: [candidateId], references: [id])
   jobId       String
-  job         Job    @relation(fields: [jobId], references: [id])
+  job         Job       @relation(fields: [jobId], references: [id])
+  savedAt     DateTime  @default(now())
 
-  @@id([candidateId, jobId]) // Composite primary key
+  @@id([candidateId, jobId])
+}
+
+model Invite {
+  id        String   @id @default(uuid())
+  token     String   @unique @default(uuid())
+  email     String
+  role      String   @default("HR")
+  senderId  String
+  sender    User     @relation("InviteSender", fields: [senderId], references: [id])
+  used      Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
 }

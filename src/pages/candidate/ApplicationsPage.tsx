@@ -1,3 +1,4 @@
+import { API_BASE } from "../../lib/api";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -27,7 +28,7 @@ export function ApplicationsPage() {
       }
 
       try {
-        const response = await fetch("http://localhost:5000/api/applications", {
+        const response = await fetch(`${API_BASE}/api/applications`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const data = await response.json();

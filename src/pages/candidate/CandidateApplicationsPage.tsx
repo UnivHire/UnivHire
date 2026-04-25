@@ -1,3 +1,4 @@
+import { API_BASE } from "../../lib/api";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -37,7 +38,7 @@ export function CandidateApplicationsPage() {
       return;
     }
 
-    fetch("http://localhost:5000/api/applications", {
+    fetch(`${API_BASE}/api/applications`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then(async (res) => {
@@ -89,7 +90,7 @@ export function CandidateApplicationsPage() {
     <div className="min-h-screen bg-background">
       <SmartNavbar />
 
-      <div className="mx-auto max-w-6xl px-6 py-10 md:px-10">
+      <div className="w-full px-6 py-10 md:px-10">
         <button
           type="button"
           onClick={() => navigate("/dashboard")}

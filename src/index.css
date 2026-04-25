@@ -43,6 +43,37 @@
   --font-serif: "Inter", sans-serif;
 }
 
+.dark {
+  --color-background: 222 24% 10%;
+  --color-foreground: 210 20% 96%;
+  --color-card: 222 20% 14%;
+  --color-card-foreground: 210 20% 96%;
+  --color-popover: 222 20% 14%;
+  --color-popover-foreground: 210 20% 96%;
+  --color-primary: 210 20% 96%;
+  --color-primary-foreground: 222 24% 10%;
+  --color-secondary: 198 93% 60%;
+  --color-secondary-foreground: 222 24% 10%;
+  --color-tertiary: 40 92% 62%;
+  --color-tertiary-foreground: 222 24% 10%;
+  --color-muted: 222 18% 20%;
+  --color-muted-foreground: 214 16% 72%;
+  --color-accent: 198 93% 60%;
+  --color-accent-foreground: 222 24% 10%;
+  --color-border: 222 14% 28%;
+  --color-input: 222 14% 28%;
+  --color-ring: 198 93% 60%;
+  --color-success: 145 63% 44%;
+  --color-warning: 30 92% 58%;
+  --color-card-peach: 20 45% 26%;
+  --color-card-mint: 155 34% 24%;
+  --color-card-lavender: 262 28% 25%;
+  --color-card-sky: 202 35% 25%;
+  --color-card-pink: 342 34% 26%;
+  --color-card-cream: 45 34% 25%;
+  --color-navbar: 220 18% 8%;
+}
+
 @layer base {
   html { scroll-behavior: smooth; }
 
@@ -57,6 +88,10 @@
 
   body { @apply bg-background text-foreground antialiased; font-family: var(--font-sans); }
 
+  body {
+    transition: background-color 0.25s ease, color 0.25s ease;
+  }
+
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-sans);
     @apply text-foreground font-bold;
@@ -69,6 +104,31 @@
     outline: 3px solid hsl(var(--color-ring));
     outline-offset: 2px;
   }
+
+  /* Keep legacy utility classes readable in dark mode without touching every page. */
+  .dark .bg-white { background-color: hsl(var(--color-card)); }
+  .dark .border-white\/20 { border-color: hsl(var(--color-border)); }
+  .dark .border-white\/15 { border-color: hsl(var(--color-border)); }
+  .dark .text-black { color: hsl(var(--color-foreground)); }
+  .dark .shadow-sm { box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35); }
+
+  /* Many screens use bg-foreground + text-white for primary actions.
+     In dark theme foreground is light, so force these to a dark, high-contrast button style. */
+  .dark .bg-foreground {
+    background-color: hsl(220 18% 18%);
+  }
+  .dark .hover\:bg-foreground:hover {
+    background-color: hsl(220 18% 22%);
+  }
+
+  /* Tone down foreground-tinted backgrounds in dark mode so chips remain readable. */
+  .dark .bg-foreground\/5 { background-color: hsl(222 18% 20%); }
+  .dark .bg-foreground\/8 { background-color: hsl(222 18% 21%); }
+  .dark .bg-foreground\/10 { background-color: hsl(222 18% 22%); }
+
+  /* Improve visibility for selected controls and CTA borders that use foreground tokens. */
+  .dark .border-foreground { border-color: hsl(214 16% 72%); }
+  .dark .ring-foreground\/20 { --tw-ring-color: hsl(214 16% 72% / 0.35); }
 }
 
 @layer components {

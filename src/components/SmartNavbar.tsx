@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Menu, X, GraduationCap, MapPin, Settings, Bell, ChevronDown,
-  LogOut, LayoutDashboard, User, FileText, Bookmark as BookmarkIcon,
+  LogOut, LayoutDashboard, User, FileText, Bookmark as BookmarkIcon, Moon, Sun,
 } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 
@@ -65,6 +65,7 @@ export function SmartNavbar() {
   const [experienceIndex, setExperienceIndex] = useState(0);
   const [salaryMinK, setSalaryMinK] = useState(20);
   const [salaryMaxK, setSalaryMaxK] = useState(120);
+  const [isDarkMode, setIsDarkMode] = useState(false);
   const [openFilter, setOpenFilter] = useState<"role" | "location" | "experience" | "salary" | null>(null);
   const avatarRef = useRef<HTMLDivElement>(null);
   const filterBarRef = useRef<HTMLDivElement>(null);
@@ -107,6 +108,26 @@ export function SmartNavbar() {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem("univhire-theme");
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const shouldUseDark = stored ? stored === "dark" : prefersDark;
+
+    setIsDarkMode(shouldUseDark);
+    document.documentElement.classList.toggle("dark", shouldUseDark);
+    document.documentElement.style.colorScheme = shouldUseDark ? "dark" : "light";
+  }, []);
+
+  const toggleTheme = () => {
+    setIsDarkMode((prev) => {
+      const next = !prev;
+      document.documentElement.classList.toggle("dark", next);
+      document.documentElement.style.colorScheme = next ? "dark" : "light";
+      window.localStorage.setItem("univhire-theme", next ? "dark" : "light");
+      return next;
+    });
+  };
 
   const handleScrollNav = (href: string) => {
     if (href.startsWith("#")) {
@@ -200,6 +221,19 @@ export function SmartNavbar() {
               <MapPin size={13} className="text-white" />
               <span className="text-white">India</span>
             </div>
+
+            {isLoggedIn && (
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className="flex items-center gap-1.5 rounded-full border border-white/20 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-white/10"
+                aria-label="Toggle theme"
+                title={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
+              >
+                {isDarkMode ? <Sun size={14} /> : <Moon size={14} />}
+                <span>{isDarkMode ? "Light" : "Dark"}</span>
+              </button>
+            )}
 
             {isLoggedIn ? (
               <>
@@ -415,6 +449,13 @@ export function SmartNavbar() {
               <div className="mt-3 grid gap-2">
                 {isLoggedIn ? (
                   <>
+                    <button
+                      type="button"
+                      onClick={toggleTheme}
+                      className="rounded-xl border border-white/20 py-3 text-sm font-medium text-white"
+                    >
+                      {isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+                    </button>
                     <button type="button" onClick={() => { navigate(role === "hr" ? "/hr/dashboard" : "/dashboard"); setMobileOpen(false); }} className="rounded-xl bg-secondary py-3 text-sm font-semibold text-white">
                       My Dashboard
                     </button>

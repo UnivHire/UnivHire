@@ -1,3 +1,4 @@
+import { API_BASE } from "../../lib/api";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -16,7 +17,7 @@ export function HRDashboardPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const response = await fetch("http://localhost:5000/api/jobs");
+        const response = await fetch(`${API_BASE}/api/jobs`);
         const data = await response.json();
         if (!response.ok) throw new Error("Failed to fetch jobs");
 
@@ -47,7 +48,7 @@ export function HRDashboardPage() {
       }
 
       try {
-        const response = await fetch("http://localhost:5000/api/applications", {
+        const response = await fetch(`${API_BASE}/api/applications`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const data = await response.json();
@@ -76,7 +77,7 @@ export function HRDashboardPage() {
   return (
     <div className="min-h-screen bg-background">
       <SmartNavbar />
-      <div className="mx-auto max-w-7xl px-6 py-10 md:px-10">
+      <div className="w-full px-6 py-10 md:px-10">
         {/* Welcome */}
         <motion.div className="mb-8 rounded-2xl bg-white px-8 py-6 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
           initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>

@@ -20,6 +20,7 @@ import { SmartNavbar } from "../../components/SmartNavbar";
 import { CandidatePageHeader } from "../../components/candidate/CandidatePageHeader";
 import { useAuthStore } from "../../store/authStore";
 import { useCandidateStore } from "../../store/candidateStore";
+import { API_BASE } from "../../lib/api";
 
 type Section = "preferences" | "notifications" | "security" | "privacy" | "account";
 
@@ -33,7 +34,7 @@ const SECTIONS: { id: Section; label: string; icon: React.ReactNode; desc: strin
 
 export function CandidateSettingsPage() {
   const navigate = useNavigate();
-  const { user, logout } = useAuthStore();
+  const { user, token, logout } = useAuthStore();
   const {
     notificationSettings,
     preferences,
@@ -46,6 +47,31 @@ export function CandidateSettingsPage() {
   const [passwords, setPasswords] = useState({ current: "", next: "", confirm: "" });
   const [showPassword, setShowPassword] = useState({ current: false, next: false, confirm: false });
   const [deleteEmail, setDeleteEmail] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!token) return;
+    fetch(`${API_BASE}/api/users/profile`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.email) {
+          if (data.notificationSettings) {
+            try {
+              const parsed = typeof data.notificationSettings === "string" ? JSON.parse(data.notificationSettings) : data.notificationSettings;
+              updateNotificationSettings(parsed);
+            } catch {}
+          }
+          if (data.preferences) {
+            try {
+              const parsed = typeof data.preferences === "string" ? JSON.parse(data.preferences) : data.preferences;
+              updatePreferences(parsed);
+            } catch {}
+          }
+        }
+      })
+      .catch(console.error);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   useEffect(() => {
     if (!toast) return;
@@ -54,6 +80,34 @@ export function CandidateSettingsPage() {
   }, [toast]);
 
   const showSaved = (message: string) => setToast(message);
+
+  const saveSettingsToBackend = async (payload: any, type: "notificationSettings" | "preferences") => {
+    if (!token) return;
+    setSaving(true);
+    try {
+      await fetch(`${API_BASE}/api/users/profile`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ [type]: JSON.stringify(payload) }),
+      });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleUpdatePreferences = (payload: any) => {
+    const next = { ...preferences, ...payload };
+    updatePreferences(next);
+    saveSettingsToBackend(next, "preferences");
+  };
+
+  const handleUpdateNotificationSettings = (payload: any) => {
+    const next = { ...notificationSettings, ...payload };
+    updateNotificationSettings(next);
+    saveSettingsToBackend(next, "notificationSettings");
+  };
 
   const Toggle = ({
     value,
@@ -71,13 +125,28 @@ export function CandidateSettingsPage() {
     </button>
   );
 
-  const changePassword = () => {
+  const changePassword = async () => {
     if (!passwords.current || passwords.next.length < 8 || passwords.next !== passwords.confirm) {
-      setToast("Please enter a valid password update.");
+      setToast("Please enter a valid password update (min 8 chars).");
       return;
     }
-    setPasswords({ current: "", next: "", confirm: "" });
-    showSaved("Password updated");
+    if (!token) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/users/change-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ currentPassword: passwords.current, newPassword: passwords.next }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      setPasswords({ current: "", next: "", confirm: "" });
+      showSaved("Password updated");
+    } catch (err: any) {
+      setToast(err.message || "Failed to update password");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const deleteAccount = () => {
@@ -90,7 +159,7 @@ export function CandidateSettingsPage() {
     <div className="min-h-screen bg-background">
       <SmartNavbar />
 
-      <div className="mx-auto max-w-7xl px-6 py-10 md:px-10">
+      <div className="w-full px-6 py-10 md:px-10">
         <button
           type="button"
           onClick={() => navigate("/dashboard")}
@@ -146,7 +215,7 @@ export function CandidateSettingsPage() {
                     </span>
                     <select
                       value={preferences.theme}
-                      onChange={(e) => updatePreferences({ theme: e.target.value as "light" | "system" })}
+                      onChange={(e) => handleUpdatePreferences({ theme: e.target.value as "light" | "system" })}
                       className="rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground outline-none focus:border-foreground/40"
                     >
                       <option value="light">Light</option>
@@ -159,7 +228,7 @@ export function CandidateSettingsPage() {
                     </span>
                     <select
                       value={preferences.density}
-                      onChange={(e) => updatePreferences({ density: e.target.value as "comfortable" | "compact" })}
+                      onChange={(e) => handleUpdatePreferences({ density: e.target.value as "comfortable" | "compact" })}
                       className="rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground outline-none focus:border-foreground/40"
                     >
                       <option value="comfortable">Comfortable</option>
@@ -173,7 +242,7 @@ export function CandidateSettingsPage() {
                     <select
                       value={preferences.jobAlertFrequency}
                       onChange={(e) =>
-                        updatePreferences({
+                        handleUpdatePreferences({
                           jobAlertFrequency: e.target.value as "instant" | "daily" | "weekly",
                         })
                       }
@@ -191,7 +260,7 @@ export function CandidateSettingsPage() {
                     <input
                       type="number"
                       value={preferences.minSalaryK}
-                      onChange={(e) => updatePreferences({ minSalaryK: Number(e.target.value) || 20 })}
+                      onChange={(e) => handleUpdatePreferences({ minSalaryK: Number(e.target.value) || 20 })}
                       className="rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground outline-none focus:border-foreground/40"
                     />
                   </label>
@@ -225,7 +294,7 @@ export function CandidateSettingsPage() {
                       <Toggle
                         value={notificationSettings[item.key]}
                         onToggle={() =>
-                          updateNotificationSettings({
+                          handleUpdateNotificationSettings({
                             [item.key]: !notificationSettings[item.key],
                           })
                         }
@@ -302,7 +371,7 @@ export function CandidateSettingsPage() {
                     <Toggle
                       value={preferences.profileVisibleToUniversities}
                       onToggle={() =>
-                        updatePreferences({
+                        handleUpdatePreferences({
                           profileVisibleToUniversities: !preferences.profileVisibleToUniversities,
                         })
                       }
@@ -316,7 +385,7 @@ export function CandidateSettingsPage() {
                     <Toggle
                       value={preferences.openToRelocate}
                       onToggle={() =>
-                        updatePreferences({ openToRelocate: !preferences.openToRelocate })
+                        handleUpdatePreferences({ openToRelocate: !preferences.openToRelocate })
                       }
                     />
                   </div>
