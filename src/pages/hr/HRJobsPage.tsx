@@ -1,4 +1,4 @@
-import { API_BASE } from "../../lib/api";
+import { API_BASE, apiFetch } from "../../lib/api";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -40,12 +40,15 @@ export function HRJobsPage() {
   const { user, token } = useAuthStore();
   const [jobs, setJobs] = useState<any[]>([]);
   const [isPending, setIsPending] = useState(true);
+  const [mutatingJobId, setMutatingJobId] = useState<string | null>(null);
   const [roleFilter, setRoleFilter] = useState("All");
   const [sortBy, setSortBy] = useState("newest");
 
   const loadJobs = async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/jobs`);
+      const response = await fetch(`${API_BASE}/api/jobs?includeClosed=1`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
       const data = await response.json();
       if (!response.ok) throw new Error("Failed to fetch jobs");
       const hrJobs = (data || []).filter((j: any) => j?.hrId === user?.id);
@@ -74,6 +77,29 @@ export function HRJobsPage() {
     });
     if (!response.ok) return;
     setJobs((prev) => prev.filter((j) => j.id !== jobId));
+  };
+
+  const toggleJobStatus = async (job: any) => {
+    if (!token) return;
+    const nextStatus = String(job?.status || "OPEN").toUpperCase() === "OPEN" ? "CLOSED" : "OPEN";
+    setMutatingJobId(job.id);
+    try {
+      const response = await apiFetch(`/api/jobs/${job.id}`, token, {
+        method: "PATCH",
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      if (!response.ok) throw new Error("Failed to update status");
+      const updated = await response.json();
+      setJobs((prev) => prev.map((j) => (j.id === job.id ? updated : j)));
+    } catch {
+      // Keep UX silent for now to match existing page behavior.
+    } finally {
+      setMutatingJobId(null);
+    }
+  };
+
+  const editJob = (job: any) => {
+    navigate(`/hr/jobs/${job.id}/edit`);
   };
 
   const filteredAndSortedJobs = [...jobs]
@@ -197,6 +223,22 @@ export function HRJobsPage() {
                 </div>
 
                 <div className="flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    disabled={mutatingJobId === j.id}
+                    onClick={() => editJob(j)}
+                    className="rounded-full border border-border px-3.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-background disabled:opacity-60"
+                  >
+                    Edit Post
+                  </button>
+                  <button
+                    type="button"
+                    disabled={mutatingJobId === j.id}
+                    onClick={() => toggleJobStatus(j)}
+                    className="rounded-full border border-amber-200 px-3.5 py-1.5 text-xs font-semibold text-amber-700 transition hover:bg-amber-50 disabled:opacity-60"
+                  >
+                    {String(j.status || "OPEN").toUpperCase() === "OPEN" ? "Deactivate" : "Activate"}
+                  </button>
                   <button
                     type="button"
                     onClick={() => navigate(`/hr/applications?jobType=${encodeURIComponent(j.jobType || "")}`)}

@@ -14,9 +14,40 @@ export interface CandidateJob {
   salaryMinK?: number | null;
   salaryMaxK?: number | null;
   experience?: string;
+  experienceYears?: number;
   workplaceType?: string;
+  seniorityLevel?: string;
+  requiredSkills?: string[];
+  industries?: string[];
+  jobFunctions?: string[];
+  screeningQuestions?: Array<{ type: string; mustHave?: boolean }>;
+  applicationMode?: string;
+  applicationEmail?: string;
+  externalApplyUrl?: string;
+  requireResume?: boolean;
   organizationLogoUrl?: string;
   cardTheme?: string;
+}
+
+function splitCsv(raw: unknown): string[] {
+  return String(raw || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function parseScreening(raw: unknown): Array<{ type: string; mustHave?: boolean }> {
+  const source = String(raw || "").trim();
+  if (!source) return [];
+  try {
+    const parsed = JSON.parse(source);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((q: any) => ({ type: String(q?.type || "").trim(), mustHave: Boolean(q?.mustHave) }))
+      .filter((q) => q.type);
+  } catch {
+    return [];
+  }
 }
 
 export const FALLBACK_CANDIDATE_JOBS: CandidateJob[] = [
@@ -103,7 +134,17 @@ export function normalizeCandidateJob(raw: any): CandidateJob {
     salaryMinK: typeof raw?.salaryMinK === "number" ? raw.salaryMinK : null,
     salaryMaxK: typeof raw?.salaryMaxK === "number" ? raw.salaryMaxK : null,
     experience: raw?.experience ? String(raw.experience) : "",
+    experienceYears: typeof raw?.experienceYears === "number" ? raw.experienceYears : 0,
     workplaceType: raw?.workplaceType ? String(raw.workplaceType) : "",
+    seniorityLevel: raw?.seniorityLevel ? String(raw.seniorityLevel) : "",
+    requiredSkills: splitCsv(raw?.requiredSkills),
+    industries: splitCsv(raw?.industry),
+    jobFunctions: splitCsv(raw?.jobFunction),
+    screeningQuestions: parseScreening(raw?.screeningQuestions),
+    applicationMode: raw?.applicationMode ? String(raw.applicationMode) : "",
+    applicationEmail: raw?.applicationEmail ? String(raw.applicationEmail) : "",
+    externalApplyUrl: raw?.externalApplyUrl ? String(raw.externalApplyUrl) : "",
+    requireResume: typeof raw?.requireResume === "boolean" ? raw.requireResume : true,
     organizationLogoUrl: normalizedLogo,
     cardTheme: raw?.cardTheme ? String(raw.cardTheme) : "",
   };

@@ -56,6 +56,7 @@ export function SmartNavbar() {
   const location = useLocation();
   const { token, role, user, logout } = useAuthStore();
   const isLoggedIn = !!token;
+  const isHrLike = role === "hr" || role === "admin";
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [avatarOpen, setAvatarOpen] = useState(false);
@@ -152,7 +153,7 @@ export function SmartNavbar() {
     setAvatarOpen(false);
   };
 
-  const navItems = !isLoggedIn ? PUBLIC_NAV : role === "hr" || role === "admin" ? HR_NAV : CANDIDATE_NAV;
+  const navItems = !isLoggedIn ? PUBLIC_NAV : isHrLike ? HR_NAV : CANDIDATE_NAV;
 
   const isActive = (href: string) => {
     if (href.startsWith("#")) return activeHash === href;
@@ -240,7 +241,7 @@ export function SmartNavbar() {
                 {/* Settings */}
                 <button
                   type="button"
-                  onClick={() => navigate(role === "hr" ? "/hr/settings" : "/settings")}
+                  onClick={() => navigate(isHrLike ? "/hr/settings" : "/settings")}
                   className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 text-white/70 transition hover:text-white"
                   aria-label="Settings"
                 >
@@ -249,7 +250,7 @@ export function SmartNavbar() {
                 {/* Notifications */}
                 <button
                   type="button"
-                  onClick={() => navigate(role === "hr" ? "/hr/dashboard" : "/notifications")}
+                  onClick={() => navigate(isHrLike ? "/hr/dashboard" : "/notifications")}
                   className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 text-white/70 transition hover:text-white"
                   aria-label="Notifications"
                 >
@@ -282,10 +283,10 @@ export function SmartNavbar() {
                           <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
                         </div>
                         <div className="py-1.5">
-                          <DropdownItem icon={<LayoutDashboard size={14} />} label="My Dashboard" onClick={() => { navigate(role === "hr" ? "/hr/dashboard" : "/dashboard"); setAvatarOpen(false); }} />
-                          <DropdownItem icon={<User size={14} />} label="My Profile" onClick={() => { navigate(role === "hr" ? "/hr/profile" : "/profile"); setAvatarOpen(false); }} />
-                          <DropdownItem icon={<Settings size={14} />} label="Settings" onClick={() => { navigate(role === "hr" ? "/hr/settings" : "/settings"); setAvatarOpen(false); }} />
-                          <DropdownItem icon={<FileText size={14} />} label="My Applications" onClick={() => { navigate(role === "hr" ? "/hr/applications" : "/applications"); setAvatarOpen(false); }} />
+                          <DropdownItem icon={<LayoutDashboard size={14} />} label="My Dashboard" onClick={() => { navigate(isHrLike ? "/hr/dashboard" : "/dashboard"); setAvatarOpen(false); }} />
+                          <DropdownItem icon={<User size={14} />} label="My Profile" onClick={() => { navigate(isHrLike ? "/hr/profile" : "/profile"); setAvatarOpen(false); }} />
+                          <DropdownItem icon={<Settings size={14} />} label="Settings" onClick={() => { navigate(isHrLike ? "/hr/settings" : "/settings"); setAvatarOpen(false); }} />
+                          <DropdownItem icon={<FileText size={14} />} label="My Applications" onClick={() => { navigate(isHrLike ? "/hr/applications" : "/applications"); setAvatarOpen(false); }} />
                           {role === "candidate" && (
                             <DropdownItem icon={<BookmarkIcon size={14} />} label="Saved Jobs" onClick={() => { navigate("/saved"); setAvatarOpen(false); }} />
                           )}
@@ -456,7 +457,7 @@ export function SmartNavbar() {
                     >
                       {isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
                     </button>
-                    <button type="button" onClick={() => { navigate(role === "hr" ? "/hr/dashboard" : "/dashboard"); setMobileOpen(false); }} className="rounded-xl bg-secondary py-3 text-sm font-semibold text-white">
+                    <button type="button" onClick={() => { navigate(isHrLike ? "/hr/dashboard" : "/dashboard"); setMobileOpen(false); }} className="rounded-xl bg-secondary py-3 text-sm font-semibold text-white">
                       My Dashboard
                     </button>
                     <button type="button" onClick={() => { handleLogout(); setMobileOpen(false); }} className="rounded-xl border border-white/20 py-3 text-sm font-medium text-white">
