@@ -1,11 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Menu, X, GraduationCap, MapPin, Settings, Bell, ChevronDown,
   LogOut, LayoutDashboard, User, FileText, Bookmark as BookmarkIcon, Moon, Sun,
+  Search, Briefcase, BellRing, CheckCheck,
 } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
+import { useCandidateStore } from "../store/candidateStore";
 
 /** Items shown when NOT logged in (landing page visitors) */
 const PUBLIC_NAV = [
@@ -17,9 +19,9 @@ const PUBLIC_NAV = [
 
 /** Items shown to logged-in CANDIDATES */
 const CANDIDATE_NAV = [
-  { label: "Find Jobs ★", href: "/dashboard" },
+  { label: "Community", href: "/community" },
+  { label: "Browse Jobs", href: "/dashboard" },
   { label: "My Applications", href: "/applications" },
-  { label: "Saved", href: "/saved" },
 ];
 
 /** Items shown to logged-in HR */
@@ -55,11 +57,17 @@ export function SmartNavbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const { token, role, user, logout } = useAuthStore();
+  const {
+    notifications,
+    markAllNotificationsRead,
+    markNotificationRead,
+  } = useCandidateStore();
   const isLoggedIn = !!token;
   const isHrLike = role === "hr" || role === "admin";
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [avatarOpen, setAvatarOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [activeHash, setActiveHash] = useState("#home");
   const [roleIndex, setRoleIndex] = useState(0);
   const [locationIndex, setLocationIndex] = useState(0);
@@ -69,6 +77,7 @@ export function SmartNavbar() {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [openFilter, setOpenFilter] = useState<"role" | "location" | "experience" | "salary" | null>(null);
   const avatarRef = useRef<HTMLDivElement>(null);
+  const notificationsRef = useRef<HTMLDivElement>(null);
   const filterBarRef = useRef<HTMLDivElement>(null);
 
   const isLanding = location.pathname === "/";
@@ -94,6 +103,9 @@ export function SmartNavbar() {
     const handler = (e: MouseEvent) => {
       if (avatarRef.current && !avatarRef.current.contains(e.target as Node)) {
         setAvatarOpen(false);
+      }
+      if (notificationsRef.current && !notificationsRef.current.contains(e.target as Node)) {
+        setNotificationsOpen(false);
       }
     };
     document.addEventListener("mousedown", handler);
@@ -154,6 +166,10 @@ export function SmartNavbar() {
   };
 
   const navItems = !isLoggedIn ? PUBLIC_NAV : isHrLike ? HR_NAV : CANDIDATE_NAV;
+  const unreadCount = useMemo(
+    () => notifications.filter((item) => !item.read).length,
+    [notifications]
+  );
 
   const isActive = (href: string) => {
     if (href.startsWith("#")) return activeHash === href;
@@ -248,14 +264,47 @@ export function SmartNavbar() {
                   <Settings size={16} />
                 </button>
                 {/* Notifications */}
-                <button
-                  type="button"
-                  onClick={() => navigate(isHrLike ? "/hr/dashboard" : "/notifications")}
-                  className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 text-white/70 transition hover:text-white"
-                  aria-label="Notifications"
-                >
-                  <Bell size={16} />
-                </button>
+                <div ref={notificationsRef} className="relative">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (isHrLike) {
+                        navigate("/hr/dashboard");
+                        return;
+                      }
+                      setNotificationsOpen((value) => !value);
+                      setAvatarOpen(false);
+                    }}
+                    className="relative flex h-9 w-9 items-center justify-center rounded-full border border-white/20 text-white/70 transition hover:text-white"
+                    aria-label="Notifications"
+                  >
+                    <Bell size={16} />
+                    {!isHrLike && unreadCount > 0 ? (
+                      <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-secondary px-1 text-[10px] font-bold text-white">
+                        {unreadCount}
+                      </span>
+                    ) : null}
+                  </button>
+
+                  <AnimatePresence>
+                    {!isHrLike && notificationsOpen ? (
+                      <NotificationDropdown
+                        notifications={notifications}
+                        onMarkAllRead={markAllNotificationsRead}
+                        onMarkRead={markNotificationRead}
+                        onOpen={(href, id) => {
+                          markNotificationRead(id);
+                          setNotificationsOpen(false);
+                          navigate(href);
+                        }}
+                        onSettings={() => {
+                          setNotificationsOpen(false);
+                          navigate("/settings");
+                        }}
+                      />
+                    ) : null}
+                  </AnimatePresence>
+                </div>
                 {/* Avatar dropdown */}
                 <div ref={avatarRef} className="relative">
                   <button
@@ -283,7 +332,7 @@ export function SmartNavbar() {
                           <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
                         </div>
                         <div className="py-1.5">
-                          <DropdownItem icon={<LayoutDashboard size={14} />} label="My Dashboard" onClick={() => { navigate(isHrLike ? "/hr/dashboard" : "/dashboard"); setAvatarOpen(false); }} />
+                          <DropdownItem icon={<LayoutDashboard size={14} />} label="My Dashboard" onClick={() => { navigate(isHrLike ? "/hr/dashboard" : "/community"); setAvatarOpen(false); }} />
                           <DropdownItem icon={<User size={14} />} label="My Profile" onClick={() => { navigate(isHrLike ? "/hr/profile" : "/profile"); setAvatarOpen(false); }} />
                           <DropdownItem icon={<Settings size={14} />} label="Settings" onClick={() => { navigate(isHrLike ? "/hr/settings" : "/settings"); setAvatarOpen(false); }} />
                           <DropdownItem icon={<FileText size={14} />} label="My Applications" onClick={() => { navigate(isHrLike ? "/hr/applications" : "/applications"); setAvatarOpen(false); }} />
@@ -457,7 +506,7 @@ export function SmartNavbar() {
                     >
                       {isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
                     </button>
-                    <button type="button" onClick={() => { navigate(isHrLike ? "/hr/dashboard" : "/dashboard"); setMobileOpen(false); }} className="rounded-xl bg-secondary py-3 text-sm font-semibold text-white">
+                    <button type="button" onClick={() => { navigate(isHrLike ? "/hr/dashboard" : "/community"); setMobileOpen(false); }} className="rounded-xl bg-secondary py-3 text-sm font-semibold text-white">
                       My Dashboard
                     </button>
                     <button type="button" onClick={() => { handleLogout(); setMobileOpen(false); }} className="rounded-xl border border-white/20 py-3 text-sm font-medium text-white">
@@ -535,6 +584,124 @@ function FilterPill({
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+function NotificationDropdown({
+  notifications,
+  onMarkAllRead,
+  onMarkRead,
+  onOpen,
+  onSettings,
+}: {
+  notifications: ReturnType<typeof useCandidateStore.getState>["notifications"];
+  onMarkAllRead: () => void;
+  onMarkRead: (id: string) => void;
+  onOpen: (href: string, id: string) => void;
+  onSettings: () => void;
+}) {
+  const latest = notifications.slice(0, 5);
+  const unreadCount = notifications.filter((item) => !item.read).length;
+
+  return (
+    <motion.div
+      className="absolute right-0 top-11 z-50 w-[360px] overflow-hidden rounded-2xl border border-border bg-white shadow-xl"
+      initial={{ opacity: 0, y: -8, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -6, scale: 0.96 }}
+      transition={{ duration: 0.15 }}
+    >
+      <div className="flex items-center justify-between border-b border-border px-4 py-3">
+        <div>
+          <p className="text-sm font-bold text-foreground">Notifications</p>
+          <p className="text-xs text-muted-foreground">{unreadCount} unread updates</p>
+        </div>
+        <button
+          type="button"
+          onClick={onMarkAllRead}
+          className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-bold text-foreground transition hover:bg-background"
+        >
+          <CheckCheck size={13} />
+          Read all
+        </button>
+      </div>
+
+      <div className="max-h-[360px] overflow-y-auto p-2">
+        {latest.length === 0 ? (
+          <div className="px-4 py-8 text-center">
+            <BellRing size={22} className="mx-auto mb-2 text-muted-foreground" />
+            <p className="text-sm font-semibold text-foreground">No notifications yet</p>
+            <p className="mt-1 text-xs text-muted-foreground">Application and job updates will appear here.</p>
+          </div>
+        ) : (
+          latest.map((notification) => (
+            <div
+              key={notification.id}
+              className={`rounded-xl px-3 py-3 transition ${
+                notification.read ? "hover:bg-background" : "bg-secondary/8"
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-background text-foreground">
+                  {notification.type === "application" ? (
+                    <Briefcase size={15} />
+                  ) : notification.type === "job" ? (
+                    <Search size={15} />
+                  ) : (
+                    <BellRing size={15} />
+                  )}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm font-bold leading-5 text-foreground">{notification.title}</p>
+                    {!notification.read ? (
+                      <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-secondary" />
+                    ) : null}
+                  </div>
+                  <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
+                    {notification.description}
+                  </p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    {new Date(notification.createdAt).toLocaleString("en-IN")}
+                  </p>
+
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {notification.ctaHref ? (
+                      <button
+                        type="button"
+                        onClick={() => onOpen(notification.ctaHref || "/dashboard", notification.id)}
+                        className="rounded-full bg-foreground px-3 py-1.5 text-xs font-bold text-white transition hover:opacity-85"
+                      >
+                        {notification.ctaLabel || "Open"}
+                      </button>
+                    ) : null}
+                    {!notification.read ? (
+                      <button
+                        type="button"
+                        onClick={() => onMarkRead(notification.id)}
+                        className="rounded-full border border-border px-3 py-1.5 text-xs font-bold text-foreground transition hover:bg-background"
+                      >
+                        Mark read
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      <div className="border-t border-border p-2">
+        <button
+          type="button"
+          onClick={onSettings}
+          className="w-full rounded-xl px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-background"
+        >
+          Notification settings
+        </button>
+      </div>
+    </motion.div>
   );
 }
 

@@ -9,7 +9,7 @@ import { CandidateApplicationsPage } from "./pages/candidate/CandidateApplicatio
 import { CandidateSavedPage } from "./pages/candidate/CandidateSavedPage";
 import { CandidateProfilePage } from "./pages/candidate/CandidateProfilePage";
 import { CandidateSettingsPage } from "./pages/candidate/CandidateSettingsPage";
-import { CandidateNotificationsPage } from "./pages/candidate/CandidateNotificationsPage";
+import { CandidateCommunityPage } from "./pages/candidate/CandidateCommunityPage";
 import { HRDashboardPage } from "./pages/hr/HRDashboardPage";
 import { PostJobPage } from "./pages/hr/PostJobPage";
 import { HRJobsPage } from "./pages/hr/HRJobsPage";
@@ -32,7 +32,7 @@ function RootRoute() {
 
   const destination =
     role === "candidate"
-      ? "/dashboard"
+      ? "/community"
       : role === "hr"
         ? "/hr/dashboard"
         : "/admin";
@@ -51,13 +51,13 @@ function App() {
         <Route path="/invite/:token" element={<InvitePage />} />
 
         {/* ── Candidate (protected) ───────────────── */}
+        <Route path="/community" element={<ProtectedRoute requiredRole="candidate"><CandidateCommunityPage /></ProtectedRoute>} />
         <Route path="/dashboard" element={<ProtectedRoute requiredRole="candidate"><CandidateDashboardPage /></ProtectedRoute>} />
         <Route path="/jobs/:id" element={<ProtectedRoute requiredRole="candidate"><CandidateJobDetailPage /></ProtectedRoute>} />
         <Route path="/applications" element={<ProtectedRoute requiredRole="candidate"><CandidateApplicationsPage /></ProtectedRoute>} />
         <Route path="/saved" element={<ProtectedRoute requiredRole="candidate"><CandidateSavedPage /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute requiredRole="candidate"><CandidateProfilePage /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute requiredRole="candidate"><CandidateSettingsPage /></ProtectedRoute>} />
-        <Route path="/notifications" element={<ProtectedRoute requiredRole="candidate"><CandidateNotificationsPage /></ProtectedRoute>} />
 
         {/* ── HR (protected) ──────────────────────── */}
         <Route path="/hr/dashboard" element={<ProtectedRoute requiredRole={["hr", "admin"]}><HRDashboardPage /></ProtectedRoute>} />

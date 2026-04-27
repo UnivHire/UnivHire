@@ -121,6 +121,54 @@ const defaultProfile: CandidateProfile = {
   skills: ["Communication", "Teamwork", "Problem Solving"],
 };
 
+const toProfileString = (value: unknown, fallback = "") =>
+  typeof value === "string" ? value : fallback;
+
+const toProfileSkills = (value: unknown) => {
+  if (Array.isArray(value)) {
+    return value
+      .filter((skill): skill is string => typeof skill === "string")
+      .map((skill) => skill.trim())
+      .filter(Boolean);
+  }
+
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((skill) => skill.trim())
+      .filter(Boolean);
+  }
+
+  return defaultProfile.skills;
+};
+
+export function normalizeCandidateProfile(profile?: Partial<CandidateProfile> | null): CandidateProfile {
+  const next = { ...defaultProfile, ...(profile || {}) };
+
+  return {
+    ...next,
+    name: toProfileString(next.name),
+    email: toProfileString(next.email),
+    phone: toProfileString(next.phone),
+    headline: toProfileString(next.headline, defaultProfile.headline),
+    preferredRole: toProfileString(next.preferredRole, defaultProfile.preferredRole),
+    location: toProfileString(next.location, defaultProfile.location),
+    about: toProfileString(next.about, defaultProfile.about),
+    resumeUrl: toProfileString(next.resumeUrl),
+    portfolioUrl: toProfileString(next.portfolioUrl),
+    experienceLevel: toProfileString(next.experienceLevel, defaultProfile.experienceLevel),
+    availability: toProfileString(next.availability, defaultProfile.availability),
+    skills: toProfileSkills(next.skills),
+  };
+}
+
+export function serializeCandidateProfile(profile: CandidateProfile) {
+  return {
+    ...profile,
+    skills: profile.skills.join(", "),
+  };
+}
+
 const defaultNotificationSettings: CandidateNotificationSettings = {
   applicationUpdates: true,
   matchingJobs: true,
@@ -148,15 +196,15 @@ export const useCandidateStore = create<CandidateState>()(
       preferences: defaultPreferences,
       syncFromAuth: (user) =>
         set((state) => ({
-          profile: {
+          profile: normalizeCandidateProfile({
             ...state.profile,
             name: state.profile.name || user?.name || "",
             email: state.profile.email || user?.email || "",
-          },
+          }),
         })),
       updateProfile: (payload) =>
         set((state) => ({
-          profile: { ...state.profile, ...payload },
+          profile: normalizeCandidateProfile({ ...state.profile, ...payload }),
         })),
       saveJob: (job) =>
         set((state) => ({
@@ -197,6 +245,26 @@ export const useCandidateStore = create<CandidateState>()(
           preferences: { ...state.preferences, ...payload },
         })),
     }),
-    { name: "univhire-candidate" }
+    {
+      name: "univhire-candidate",
+      merge: (persistedState, currentState) => {
+        const persisted = persistedState as Partial<CandidateState> | undefined;
+
+        return {
+          ...currentState,
+          savedJobs: persisted?.savedJobs || currentState.savedJobs,
+          notifications: persisted?.notifications || currentState.notifications,
+          profile: normalizeCandidateProfile(persisted?.profile),
+          notificationSettings: {
+            ...defaultNotificationSettings,
+            ...persisted?.notificationSettings,
+          },
+          preferences: {
+            ...defaultPreferences,
+            ...persisted?.preferences,
+          },
+        };
+      },
+    }
   )
 );

@@ -413,10 +413,10 @@ export function CandidateSettingsPage() {
                   />
                   <ActionRow
                     icon={<Bell size={16} />}
-                    title="Review notifications"
-                    description="Check unread updates from applications and matching jobs."
-                    actionLabel="Open notifications"
-                    onAction={() => navigate("/notifications")}
+                    title="Notification settings"
+                    description="Tune alerts for applications, matching jobs, and saved roles."
+                    actionLabel="Open settings"
+                    onAction={() => setActive("notifications")}
                   />
                 </div>
 
