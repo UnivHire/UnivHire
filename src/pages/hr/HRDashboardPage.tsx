@@ -17,7 +17,9 @@ export function HRDashboardPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const response = await fetch(`${API_BASE}/api/jobs`);
+        const response = await fetch(`${API_BASE}/api/jobs?includeClosed=1`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        });
         const data = await response.json();
         if (!response.ok) throw new Error("Failed to fetch jobs");
 
@@ -119,9 +121,18 @@ export function HRDashboardPage() {
                       <p className="text-sm font-semibold text-foreground">{j.title}</p>
                       <p className="text-xs text-muted-foreground">{j.location} · {j.jobType}</p>
                     </div>
-                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${j.status === "OPEN" ? "bg-emerald-100 text-emerald-700" : "bg-muted text-muted-foreground"}`}>
-                      {j.status === "OPEN" ? "Open" : "Closed"}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${j.status === "OPEN" ? "bg-emerald-100 text-emerald-700" : "bg-muted text-muted-foreground"}`}>
+                        {j.status === "OPEN" ? "Open" : "Closed"}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/hr/jobs/${j.id}/edit`)}
+                        className="rounded-full border border-border px-3 py-1 text-xs font-semibold text-foreground transition hover:bg-background"
+                      >
+                        Edit
+                      </button>
+                    </div>
                   </div>
                 ))}
                 {(!jobs || jobs.length === 0) && <p className="text-sm text-muted-foreground py-4 text-center">No jobs posted yet.</p>}

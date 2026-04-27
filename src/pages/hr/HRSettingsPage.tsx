@@ -28,7 +28,7 @@ const SIDEBAR_ITEMS: { id: Section; label: string; icon: React.ReactNode; desc: 
 
 export function HRSettingsPage() {
   const navigate = useNavigate();
-  const { user, logout } = useAuthStore();
+  const { user, token, logout } = useAuthStore();
   const [active, setActive] = useState<Section>("profile");
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState("");

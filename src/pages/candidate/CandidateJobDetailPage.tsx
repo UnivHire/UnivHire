@@ -36,6 +36,8 @@ export function CandidateJobDetailPage() {
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [currentLocation, setCurrentLocation] = useState("");
+  const [experienceYears, setExperienceYears] = useState("");
+  const [screeningAnswers, setScreeningAnswers] = useState<Record<string, "" | "YES" | "NO">>({});
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [errorStr, setErrorStr] = useState("");
 
@@ -58,6 +60,23 @@ export function CandidateJobDetailPage() {
   const isSaved = useMemo(() => (job ? Boolean(savedJobs[job.id]) : false), [job, savedJobs]);
   const themeClass = job ? resolveJobThemeClass(job) : "card-peach";
 
+  useEffect(() => {
+    if (!job?.screeningQuestions || job.screeningQuestions.length === 0) {
+      setScreeningAnswers({});
+      return;
+    }
+
+    setScreeningAnswers((prev) => {
+      const next: Record<string, "" | "YES" | "NO"> = {};
+      for (const q of job.screeningQuestions || []) {
+        const key = String(q.type || "");
+        if (!key) continue;
+        next[key] = prev[key] || "";
+      }
+      return next;
+    });
+  }, [job]);
+
   const handleApply = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!id || !token) return;
@@ -70,6 +89,19 @@ export function CandidateJobDetailPage() {
       return;
     }
 
+    if (!experienceYears.trim()) {
+      setErrorStr("Please enter your total experience.");
+      return;
+    }
+
+    if (job?.screeningQuestions && job.screeningQuestions.length > 0) {
+      const missing = job.screeningQuestions.find((q) => !screeningAnswers[q.type]);
+      if (missing) {
+        setErrorStr("Please answer all screening questions.");
+        return;
+      }
+    }
+
     setApplying(true);
     setErrorStr("");
     try {
@@ -78,6 +110,8 @@ export function CandidateJobDetailPage() {
       formData.append("candidatePhone", phone);
       formData.append("address", address);
       formData.append("currentLocation", currentLocation);
+      formData.append("experienceYears", experienceYears);
+      formData.append("screeningAnswers", JSON.stringify(screeningAnswers));
       formData.append("resume", resumeFile);
 
       const response = await fetch(`${API_BASE}/api/applications`, {
@@ -214,6 +248,90 @@ export function CandidateJobDetailPage() {
 
                 <section>
                   <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                    Role details
+                  </h2>
+                  <div className="flex flex-wrap gap-2">
+                    {job.workplaceType ? <Tag>{job.workplaceType.replaceAll("_", "-")}</Tag> : null}
+                    {job.seniorityLevel ? <Tag>{job.seniorityLevel.replaceAll("_", "-")}</Tag> : null}
+                    {typeof job.experienceYears === "number" && job.experienceYears > 0 ? <Tag>{`Min ${job.experienceYears} yrs experience`}</Tag> : null}
+                    {job.applicationMode ? <Tag>{job.applicationMode === "EXTERNAL" ? "External apply" : "Apply on platform"}</Tag> : null}
+                    {job.requireResume ? <Tag>Resume required</Tag> : null}
+                  </div>
+                </section>
+
+                <section>
+                  <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                    Required skills
+                  </h2>
+                  {job.requiredSkills && job.requiredSkills.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {job.requiredSkills.map((skill) => <Tag key={skill}>{skill}</Tag>)}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-foreground/70">No specific skills listed by recruiter.</p>
+                  )}
+                </section>
+
+                <section>
+                  <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                    Recommended industries
+                  </h2>
+                  {job.industries && job.industries.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {job.industries.map((industry) => <Tag key={industry}>{industry}</Tag>)}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-foreground/70">No industries mentioned for this role.</p>
+                  )}
+                </section>
+
+                <section>
+                  <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                    Job functions
+                  </h2>
+                  {job.jobFunctions && job.jobFunctions.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {job.jobFunctions.map((fn) => <Tag key={fn}>{fn}</Tag>)}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-foreground/70">No job functions listed.</p>
+                  )}
+                </section>
+
+                {job.screeningQuestions && job.screeningQuestions.length > 0 ? (
+                  <section>
+                    <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                      Screening questions
+                    </h2>
+                    <div className="space-y-2">
+                      {job.screeningQuestions.map((q, idx) => (
+                        <div key={`${q.type}-${idx}`} className="rounded-2xl bg-background px-4 py-3 text-sm text-foreground/80">
+                          <span>{q.type}</span>
+                          {q.mustHave ? <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">Must-have</span> : null}
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
+
+                {job.applicationMode === "EXTERNAL" && job.externalApplyUrl ? (
+                  <section>
+                    <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                      External application link
+                    </h2>
+                    <a
+                      href={job.externalApplyUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center rounded-full border border-border bg-white px-4 py-2 text-sm font-semibold text-foreground hover:bg-background"
+                    >
+                      Open external apply page
+                    </a>
+                  </section>
+                ) : null}
+
+                <section>
+                  <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                     Why candidates save this role
                   </h2>
                   <div className="grid gap-3 md:grid-cols-3">
@@ -286,6 +404,43 @@ export function CandidateJobDetailPage() {
                       placeholder="Delhi, India"
                     />
 
+                    <Field
+                      label="Total experience (years)"
+                      value={experienceYears}
+                      onChange={setExperienceYears}
+                      placeholder={typeof job.experienceYears === "number" && job.experienceYears > 0 ? `Minimum ${job.experienceYears} years required` : "e.g. 2"}
+                    />
+
+                    {job.screeningQuestions && job.screeningQuestions.length > 0 ? (
+                      <div className="grid gap-2">
+                        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Screening questions
+                        </span>
+                        {job.screeningQuestions.map((q, idx) => (
+                          <label key={`${q.type}-${idx}`} className="grid gap-1.5">
+                            <span className="text-xs font-medium text-foreground">
+                              {q.type}
+                              {q.mustHave ? <span className="ml-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">Must-have</span> : null}
+                            </span>
+                            <select
+                              value={screeningAnswers[q.type] || ""}
+                              onChange={(e) =>
+                                setScreeningAnswers((prev) => ({
+                                  ...prev,
+                                  [q.type]: e.target.value as "" | "YES" | "NO",
+                                }))
+                              }
+                              className="rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground outline-none focus:border-foreground/40"
+                            >
+                              <option value="">Select answer</option>
+                              <option value="YES">Yes</option>
+                              <option value="NO">No</option>
+                            </select>
+                          </label>
+                        ))}
+                      </div>
+                    ) : null}
+
                     <label className="grid gap-1.5">
                       <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                         Resume (PDF only)
@@ -317,6 +472,10 @@ export function CandidateJobDetailPage() {
       </div>
     </div>
   );
+}
+
+function Tag({ children }: { children: React.ReactNode }) {
+  return <span className="rounded-full border border-border bg-white px-2.5 py-1 text-xs font-medium text-foreground">{children}</span>;
 }
 
 function Field({

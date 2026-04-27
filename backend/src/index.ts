@@ -212,7 +212,24 @@ app.get("/api/debug/jobs", async (_req: any, res: any) => {
 // 4. Jobs: Get all jobs
 app.get("/api/jobs", async (req: any, res: any) => {
   try {
+    const authHeader = req.headers["authorization"];
+    const bearerToken = authHeader && String(authHeader).split(" ")[1];
+    const wantsAll = String(req.query.includeClosed || "") === "1";
+
+    let viewerRole = "";
+    if (bearerToken) {
+      try {
+        const decoded: any = jwt.verify(bearerToken, JWT_SECRET);
+        viewerRole = String(decoded?.role || "").toUpperCase();
+      } catch {
+        viewerRole = "";
+      }
+    }
+
+    const canSeeClosed = wantsAll && (viewerRole === "HR" || viewerRole === "ADMIN");
+
     const jobs = await prisma.job.findMany({
+      where: canSeeClosed ? undefined : { status: "OPEN" },
       include: { hr: { select: { name: true, email: true, university: true } } },
       orderBy: { createdAt: 'desc' }
     });
@@ -226,12 +243,31 @@ app.get("/api/jobs", async (req: any, res: any) => {
 // 4b. Jobs: Get single job by id
 app.get("/api/jobs/:id", async (req: any, res: any) => {
   try {
+    const authHeader = req.headers["authorization"];
+    const bearerToken = authHeader && String(authHeader).split(" ")[1];
+
+    let viewer: { id?: string; role?: string } = {};
+    if (bearerToken) {
+      try {
+        const decoded: any = jwt.verify(bearerToken, JWT_SECRET);
+        viewer = { id: decoded?.id, role: String(decoded?.role || "").toUpperCase() };
+      } catch {
+        viewer = {};
+      }
+    }
+
     const job = await prisma.job.findUnique({
       where: { id: req.params.id },
       include: { hr: { select: { id: true, name: true, email: true, university: true } } },
     });
 
     if (!job) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+
+    const isOwnerHr = viewer.role === "HR" && viewer.id === job.hrId;
+    const isAdmin = viewer.role === "ADMIN";
+    if (job.status !== "OPEN" && !isOwnerHr && !isAdmin) {
       return res.status(404).json({ error: "Job not found" });
     }
 
@@ -348,6 +384,74 @@ app.post("/api/jobs", authenticateToken, async (req: any, res: any) => {
   }
 });
 
+// 5b. Jobs: Update a job (HR/Admin, owner for HR)
+app.patch("/api/jobs/:id", authenticateToken, async (req: any, res: any) => {
+  try {
+    if (req.user.role !== "HR" && req.user.role !== "ADMIN") {
+      return res.status(403).json({ error: "Forbidden. HR access required." });
+    }
+
+    const existingJob = await prisma.job.findUnique({ where: { id: req.params.id } });
+    if (!existingJob) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+
+    if (req.user.role === "HR" && existingJob.hrId !== req.user.id) {
+      return res.status(403).json({ error: "You can only update your own jobs." });
+    }
+
+    const data: Record<string, any> = {};
+
+    if ("title" in req.body) data.title = String(req.body.title || "").trim();
+    if ("organizationName" in req.body) data.organizationName = String(req.body.organizationName || "").trim();
+    if ("description" in req.body) data.description = String(req.body.description || "").trim();
+    if ("location" in req.body) data.location = String(req.body.location || "").trim();
+    if ("jobType" in req.body) data.jobType = String(req.body.jobType || "").trim() || existingJob.jobType;
+    if ("workplaceType" in req.body) data.workplaceType = String(req.body.workplaceType || "").trim() || existingJob.workplaceType;
+    if ("seniorityLevel" in req.body) data.seniorityLevel = String(req.body.seniorityLevel || "").trim() || existingJob.seniorityLevel;
+    if ("jobFunction" in req.body) data.jobFunction = Array.isArray(req.body.jobFunction) ? req.body.jobFunction.join(",") : String(req.body.jobFunction || "");
+    if ("industry" in req.body) data.industry = Array.isArray(req.body.industry) ? req.body.industry.join(",") : String(req.body.industry || "");
+    if ("experienceYears" in req.body) data.experienceYears = Number(req.body.experienceYears) || 0;
+    if ("requiredSkills" in req.body) data.requiredSkills = Array.isArray(req.body.requiredSkills) ? req.body.requiredSkills.join(",") : String(req.body.requiredSkills || "");
+    if ("screeningQuestions" in req.body) {
+      data.screeningQuestions = Array.isArray(req.body.screeningQuestions)
+        ? JSON.stringify(req.body.screeningQuestions)
+        : String(req.body.screeningQuestions || "[]");
+    }
+    if ("applicationMode" in req.body) data.applicationMode = String(req.body.applicationMode || "").trim() || existingJob.applicationMode;
+    if ("applicationEmail" in req.body) data.applicationEmail = String(req.body.applicationEmail || "").trim();
+    if ("requireResume" in req.body) data.requireResume = Boolean(req.body.requireResume);
+    if ("externalApplyUrl" in req.body) data.externalApplyUrl = String(req.body.externalApplyUrl || "").trim();
+
+    if ("status" in req.body) {
+      const nextStatus = String(req.body.status || "").toUpperCase();
+      if (!["OPEN", "CLOSED"].includes(nextStatus)) {
+        return res.status(400).json({ error: "Invalid status" });
+      }
+      data.status = nextStatus;
+    }
+
+    if (!Object.keys(data).length && !("cardTheme" in req.body)) {
+      return res.status(400).json({ error: "No valid fields provided" });
+    }
+
+    const updated = Object.keys(data).length
+      ? await prisma.job.update({ where: { id: req.params.id }, data })
+      : existingJob;
+
+    if ("cardTheme" in req.body) {
+      const normalizedTheme = normalizeTheme(req.body.cardTheme);
+      if (normalizedTheme) {
+        upsertJobMedia(String(req.params.id), { cardTheme: normalizedTheme });
+      }
+    }
+
+    return res.json(enrichJobWithMedia(updated));
+  } catch {
+    return res.status(500).json({ error: "Failed to update job" });
+  }
+});
+
 app.post("/api/jobs/:id/logo", authenticateToken, uploadJobLogo.single("logo"), async (req: any, res: any) => {
   try {
     if (req.user.role !== "HR" && req.user.role !== "ADMIN") {
@@ -392,6 +496,14 @@ app.post("/api/applications", authenticateToken, upload.single("resume"), async 
 
     if (!jobId) {
       return res.status(400).json({ error: "jobId is required" });
+    }
+
+    const job = await prisma.job.findUnique({ where: { id: jobId }, select: { id: true, status: true } });
+    if (!job) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+    if (String(job.status || "").toUpperCase() !== "OPEN") {
+      return res.status(400).json({ error: "This job is not accepting applications right now." });
     }
 
     const application = await prisma.application.create({
@@ -627,7 +739,11 @@ app.get("/api/saved-jobs", authenticateToken, async (req: any, res: any) => {
       include: { job: { include: { hr: { select: { name: true, university: true } } } } },
       orderBy: { savedAt: "desc" },
     });
-    return res.json(saved.map((s: any) => ({ ...s.job, savedAt: s.savedAt })));
+    return res.json(
+      saved
+        .filter((s: any) => String(s?.job?.status || "").toUpperCase() === "OPEN")
+        .map((s: any) => ({ ...s.job, savedAt: s.savedAt }))
+    );
   } catch {
     return res.status(500).json({ error: "Failed to fetch saved jobs" });
   }
