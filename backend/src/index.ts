@@ -1,19 +1,28 @@
 import express from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
-import { PrismaClient } from "./generated/prisma";
-import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
 import multer from "multer";
 import fs from "fs";
 import path from "path";
+import bcrypt from "bcrypt";
+import { prisma } from "./db";
+import authRoutes from "./auth/authRoutes";
+import { authenticateToken } from "./middleware/authenticate";
+import { verifyAuthToken, signAuthToken } from "./lib/jwt";
+import { CORS_ORIGIN } from "./config";
+import { setAuthCookie } from "./lib/cookies";
 
 dotenv.config();
 
 const app = express();
-const prisma = new PrismaClient();
-
-app.use(cors());
+app.use(
+  cors({
+    origin: CORS_ORIGIN,
+    credentials: true,
+  })
+);
+app.use(cookieParser());
 app.use(express.json());
 
 const uploadsRoot = path.join(process.cwd(), "uploads");
@@ -101,103 +110,8 @@ const uploadJobLogo = multer({
   },
 });
 
-const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret_please_change";
-
-// ── Auth Middleware ───────────────────────
-const authenticateToken = (req: any, res: any, next: any) => {
-  const authHeader = req.headers["authorization"];
-  const token = authHeader && authHeader.split(" ")[1];
-
-  if (token == null) return res.status(401).json({ error: "Unauthorized" });
-
-  jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
-    if (err) return res.status(403).json({ error: "Forbidden" });
-    req.user = user;
-    next();
-  });
-};
-
 // ── API Routes ────────────────────────────
-
-// 1. Auth: Register
-app.post("/api/auth/register", async (req: any, res: any) => {
-  try {
-    const { email, password, name, role, university } = req.body;
-
-    // Check if user exists
-    const existingUser = await prisma.user.findUnique({ where: { email } });
-    if (existingUser) {
-      return res.status(400).json({ error: "Email already taken" });
-    }
-
-    // Hash password
-    const passwordHash = await bcrypt.hash(password, 10);
-
-    // Create user
-    const user = await prisma.user.create({
-      data: {
-        email,
-        passwordHash,
-        name,
-        role,
-        university,
-      },
-    });
-
-    const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-
-    res.status(201).json({
-      token,
-      user: { id: user.id, email: user.email, name: user.name, role: user.role, university: user.university }
-    });
-  } catch (error) {
-    console.error("Register Error:", error);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// 2. Auth: Login
-app.post("/api/auth/login", async (req: any, res: any) => {
-  try {
-    const { email, password } = req.body;
-
-    // Find user
-    const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) {
-      return res.status(400).json({ error: "Invalid credentials" });
-    }
-
-    // Check pass
-    const validPassword = await bcrypt.compare(password, user.passwordHash);
-    if (!validPassword) {
-      return res.status(400).json({ error: "Invalid credentials" });
-    }
-
-    const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-
-    res.json({
-      token,
-      user: { id: user.id, email: user.email, name: user.name, role: user.role, university: user.university }
-    });
-  } catch (error) {
-    console.error("Login Error:", error);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// 3. Auth: Me
-app.get("/api/auth/me", authenticateToken, async (req: any, res: any) => {
-  try {
-    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
-    if (!user) return res.status(404).json({ error: "User not found" });
-
-    res.json({
-      id: user.id, email: user.email, name: user.name, role: user.role, university: user.university
-    });
-  } catch (error) {
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
+app.use("/api/auth", authRoutes);
 
 // DEBUG: Verify engine sees new columns
 app.get("/api/debug/jobs", async (_req: any, res: any) => {
@@ -214,12 +128,14 @@ app.get("/api/jobs", async (req: any, res: any) => {
   try {
     const authHeader = req.headers["authorization"];
     const bearerToken = authHeader && String(authHeader).split(" ")[1];
+    const cookieToken = req.cookies?.univhire_token;
+    const token = bearerToken || cookieToken;
     const wantsAll = String(req.query.includeClosed || "") === "1";
 
     let viewerRole = "";
-    if (bearerToken) {
+    if (token) {
       try {
-        const decoded: any = jwt.verify(bearerToken, JWT_SECRET);
+        const decoded = verifyAuthToken(token);
         viewerRole = String(decoded?.role || "").toUpperCase();
       } catch {
         viewerRole = "";
@@ -245,11 +161,13 @@ app.get("/api/jobs/:id", async (req: any, res: any) => {
   try {
     const authHeader = req.headers["authorization"];
     const bearerToken = authHeader && String(authHeader).split(" ")[1];
+    const cookieToken = req.cookies?.univhire_token;
+    const token = bearerToken || cookieToken;
 
     let viewer: { id?: string; role?: string } = {};
-    if (bearerToken) {
+    if (token) {
       try {
-        const decoded: any = jwt.verify(bearerToken, JWT_SECRET);
+        const decoded = verifyAuthToken(token);
         viewer = { id: decoded?.id, role: String(decoded?.role || "").toUpperCase() };
       } catch {
         viewer = {};
@@ -716,6 +634,9 @@ app.post("/api/users/change-password", authenticateToken, async (req: any, res: 
     }
     const user = await prisma.user.findUnique({ where: { id: req.user.id } });
     if (!user) return res.status(404).json({ error: "User not found" });
+    if (!user.passwordHash) {
+      return res.status(400).json({ error: "Password not set for this account" });
+    }
 
     const valid = await bcrypt.compare(currentPassword, user.passwordHash);
     if (!valid) return res.status(400).json({ error: "Current password is incorrect" });
@@ -899,7 +820,8 @@ app.post("/api/invites/:token/activate", async (req: any, res: any) => {
 
     await prisma.invite.update({ where: { token: req.params.token }, data: { used: true } });
 
-    const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: "7d" });
+    const token = signAuthToken({ id: user.id, role: user.role });
+    setAuthCookie(res, token);
     return res.status(201).json({
       token,
       user: { id: user.id, email: user.email, name: user.name, role: user.role, university: user.university },
