@@ -12,6 +12,30 @@ dist
 dist-ssr
 *.local
 
+# Environment files
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Local databases
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Runtime uploads
+backend/uploads/
+
+# Generated Prisma client
+backend/src/generated/prisma/
+
+# Build/cache output
+backend/dist/
+.vite/
+.cache/
+coverage/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -22,5 +46,3 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-
-.env
