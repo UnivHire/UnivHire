@@ -16,7 +16,7 @@ import { useAuthStore } from "../../store/authStore";
 import { useCandidateStore } from "../../store/candidateStore";
 import {
   FALLBACK_CANDIDATE_JOBS,
-  formatSalaryRange,
+  formatSalaryDisplay,
   normalizeCandidateJob,
   resolveJobThemeClass,
   toSavedJobRecord,
@@ -233,7 +233,7 @@ export function CandidateJobDetailPage() {
                   </p>
                   <div className="flex items-center gap-2 text-foreground">
                     <Sparkles size={14} />
-                    <span>{formatSalaryRange(job.salaryMinK, job.salaryMaxK)}</span>
+                    <span>{formatSalaryDisplay(job.salary, job.salaryMinK, job.salaryMaxK)}</span>
                   </div>
                 </div>
               </div>

@@ -1,7 +1,7 @@
 import { Bookmark, BookmarkCheck, Building2, MapPin, ShieldCheck } from "lucide-react";
 import { motion } from "framer-motion";
 import type { CandidateJob } from "../../lib/candidate";
-import { formatRelativeDate, formatSalaryRange, resolveJobThemeClass } from "../../lib/candidate";
+import { formatRelativeDate, formatSalaryDisplay, resolveJobThemeClass } from "../../lib/candidate";
 
 export function CandidateJobCard({
   job,
@@ -97,7 +97,7 @@ export function CandidateJobCard({
 
         <div className="flex items-center justify-between gap-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-foreground/60">
-            {formatSalaryRange(job.salaryMinK, job.salaryMaxK)}
+            {formatSalaryDisplay(job.salary, job.salaryMinK, job.salaryMaxK)}
           </p>
           <button
             type="button"

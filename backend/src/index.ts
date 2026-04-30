@@ -206,7 +206,7 @@ app.post("/api/jobs", authenticateToken, async (req: any, res: any) => {
       title, organizationName, universityName, description, location,
       jobType, workplaceType, seniorityLevel,
       jobFunction, industry, experienceYears,
-      requiredSkills, screeningQuestions,
+      salary, requiredSkills, screeningQuestions,
       applicantMode, applicantEmail, requireResume, externalUrl,
       cardTheme,
     } = req.body;
@@ -258,6 +258,7 @@ app.post("/api/jobs", authenticateToken, async (req: any, res: any) => {
         : (industry || "");
     }
     if (experienceYears !== undefined) jobData.experienceYears = Number(experienceYears) || 0;
+    if (salary !== undefined) jobData.salary = String(salary || "").trim();
     if (requiredSkills !== undefined) {
       jobData.requiredSkills = Array.isArray(requiredSkills)
         ? requiredSkills.join(",")
@@ -330,6 +331,7 @@ app.patch("/api/jobs/:id", authenticateToken, async (req: any, res: any) => {
     if ("jobFunction" in req.body) data.jobFunction = Array.isArray(req.body.jobFunction) ? req.body.jobFunction.join(",") : String(req.body.jobFunction || "");
     if ("industry" in req.body) data.industry = Array.isArray(req.body.industry) ? req.body.industry.join(",") : String(req.body.industry || "");
     if ("experienceYears" in req.body) data.experienceYears = Number(req.body.experienceYears) || 0;
+    if ("salary" in req.body) data.salary = String(req.body.salary || "").trim();
     if ("requiredSkills" in req.body) data.requiredSkills = Array.isArray(req.body.requiredSkills) ? req.body.requiredSkills.join(",") : String(req.body.requiredSkills || "");
     if ("screeningQuestions" in req.body) {
       data.screeningQuestions = Array.isArray(req.body.screeningQuestions)

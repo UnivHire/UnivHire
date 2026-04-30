@@ -354,7 +354,7 @@ export function DashboardPage() {
   );
 }
 
-function DashboardJobCard({ job, colorClass, index, onDetails }: { job: { id: string; title: string; universityName: string; category: string; location: string; isVerified: boolean }; colorClass: string; index: number; onDetails: () => void; }) {
+function DashboardJobCard({ job, colorClass, index, onDetails }: { job: { id: string; title: string; universityName: string; category: string; location: string; isVerified: boolean; salary?: string }; colorClass: string; index: number; onDetails: () => void; }) {
   const now = new Date();
   const dateStr = `${now.getDate()} ${now.toLocaleString("default", { month: "short" })}, ${now.getFullYear() - (index % 2)}`;
   const tags = [job.category, "Full time", "Verified"];
@@ -378,6 +378,9 @@ function DashboardJobCard({ job, colorClass, index, onDetails }: { job: { id: st
         <div>
           <p className="text-sm font-bold text-foreground">Open</p>
           <div className="flex items-center gap-1 text-xs text-foreground/50"><MapPin size={11} /><span>{job.location}</span></div>
+          {job.salary ? (
+            <p className="mt-1 text-xs font-semibold text-foreground/70">{job.salary}</p>
+          ) : null}
         </div>
         <button type="button" onClick={onDetails} className="rounded-full bg-foreground px-5 py-2 text-xs font-bold text-white transition hover:opacity-80">Details</button>
       </div>

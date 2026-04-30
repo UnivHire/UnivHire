@@ -13,6 +13,7 @@ export interface CandidateJob {
   createdAt?: string;
   salaryMinK?: number | null;
   salaryMaxK?: number | null;
+  salary?: string;
   experience?: string;
   experienceYears?: number;
   workplaceType?: string;
@@ -37,6 +38,11 @@ function splitCsv(raw: unknown): string[] {
 }
 
 function parseScreening(raw: unknown): Array<{ type: string; mustHave?: boolean }> {
+  if (Array.isArray(raw)) {
+    return raw
+      .map((q: any) => ({ type: String(q?.type || "").trim(), mustHave: Boolean(q?.mustHave) }))
+      .filter((q) => q.type);
+  }
   const source = String(raw || "").trim();
   if (!source) return [];
   try {
@@ -133,6 +139,7 @@ export function normalizeCandidateJob(raw: any): CandidateJob {
     createdAt: raw?.createdAt,
     salaryMinK: typeof raw?.salaryMinK === "number" ? raw.salaryMinK : null,
     salaryMaxK: typeof raw?.salaryMaxK === "number" ? raw.salaryMaxK : null,
+    salary: raw?.salary ? String(raw.salary).trim() : "",
     experience: raw?.experience ? String(raw.experience) : "",
     experienceYears: typeof raw?.experienceYears === "number" ? raw.experienceYears : 0,
     workplaceType: raw?.workplaceType ? String(raw.workplaceType) : "",
@@ -188,6 +195,12 @@ export function formatSalaryRange(min?: number | null, max?: number | null) {
   if (typeof min !== "number" || typeof max !== "number") return "Salary not disclosed";
   const maxLabel = max >= 100 ? `${(max / 100).toFixed(1).replace(".0", "")}L` : `${max}k`;
   return `INR ${min}k - ${maxLabel} / month`;
+}
+
+export function formatSalaryDisplay(salary?: string, min?: number | null, max?: number | null) {
+  const text = String(salary || "").trim();
+  if (text) return text;
+  return formatSalaryRange(min, max);
 }
 
 export function formatRelativeDate(iso?: string) {

@@ -64,6 +64,7 @@ model Job {
   jobFunction         String        @default("")
   industry            String        @default("")
   experienceYears     Int           @default(0)
+  salary              String        @default("")
   requiredSkills      String        @default("")
   screeningQuestions  String        @default("")
   applicationMode     String        @default("PLATFORM")
