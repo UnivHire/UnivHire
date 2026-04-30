@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { GraduationCap, Eye, EyeOff, AlertCircle } from "lucide-react";
 import { useAuthStore, UserRole, AuthUser } from "../store/authStore";
+import { GoogleLoginButton } from "../components/GoogleLoginButton";
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -157,6 +158,28 @@ export function LoginPage() {
             {loading ? "Signing in…" : "Login →"}
           </button>
         </form>
+
+        <div className="my-6 flex items-center gap-3 text-xs text-muted-foreground">
+          <span className="h-px flex-1 bg-border" />
+          <span>or continue with</span>
+          <span className="h-px flex-1 bg-border" />
+        </div>
+
+        <GoogleLoginButton
+          onSuccess={(data) => {
+            const nextRole = String(data.user.role || "").toLowerCase() as UserRole;
+            setAuth(data.token, nextRole, { ...data.user, roleType: data.user.role });
+            const dest = returnUrl
+              ? returnUrl
+              : nextRole === "candidate"
+              ? "/dashboard"
+              : nextRole === "hr"
+              ? "/hr/dashboard"
+              : "/admin";
+            navigate(dest, { replace: true });
+          }}
+          onError={(message) => setError(message)}
+        />
 
         <p className="mt-6 text-center text-sm text-muted-foreground">
           New to UnivHire?{" "}
