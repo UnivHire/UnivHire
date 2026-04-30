@@ -22,6 +22,7 @@ const FALLBACK_JOBS = [
     location: "Delhi",
     description: "Teach modern computing subjects and mentor students.",
     isVerified: true,
+    salary: "INR 70,000 - 95,000 / month",
   },
   {
     id: "f2",
@@ -31,6 +32,7 @@ const FALLBACK_JOBS = [
     location: "Lucknow, UP",
     description: "Coordinate security teams and maintain campus readiness.",
     isVerified: true,
+    salary: "INR 38,000 - 52,000 / month",
   },
   {
     id: "f3",
@@ -40,6 +42,7 @@ const FALLBACK_JOBS = [
     location: "Pune, MH",
     description: "Official transport duties with institutional compliance.",
     isVerified: true,
+    salary: "INR 28,000 - 36,000 / month",
   },
   {
     id: "f4",
@@ -49,6 +52,7 @@ const FALLBACK_JOBS = [
     location: "Delhi",
     description: "Manage laboratory equipment and support practical sessions.",
     isVerified: true,
+    salary: "INR 32,000 - 45,000 / month",
   },
   {
     id: "f5",
@@ -58,6 +62,7 @@ const FALLBACK_JOBS = [
     location: "Jaipur, RJ",
     description: "Oversee campus grounds maintenance and beautification.",
     isVerified: true,
+    salary: "INR 30,000 - 40,000 / month",
   },
   {
     id: "f6",
@@ -67,6 +72,7 @@ const FALLBACK_JOBS = [
     location: "Bangalore",
     description: "Lead design research initiatives within the digital lab.",
     isVerified: true,
+    salary: "INR 90,000 - 1.2L / month",
   },
 ];
 
@@ -222,7 +228,7 @@ function JobCard({
   colorClass,
   index,
 }: {
-  job: { id: string; title: string; universityName: string; category: string; location: string; description: string };
+  job: { id: string; title: string; universityName: string; category: string; location: string; description: string; salary?: string };
   colorClass: string;
   index: number;
 }) {
@@ -266,6 +272,9 @@ function JobCard({
             <MapPin size={11} />
             <span>{job.location}</span>
           </div>
+          {job.salary ? (
+            <p className="mt-1 text-xs font-semibold text-foreground/70">{job.salary}</p>
+          ) : null}
         </div>
         <button
           type="button"

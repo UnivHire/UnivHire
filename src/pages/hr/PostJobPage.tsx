@@ -63,6 +63,7 @@ interface FormState {
   jobFunctions: string[]; industries: string[];
   description: string; skills: string[]; skillInput: string;
   experienceYears: number;
+  salary: string;
   applicantMode: "email" | "external";
   applicantEmail: string; requireResume: boolean; externalUrl: string;
   screeningQuestions: { type: string; mustHave: boolean }[];
@@ -72,6 +73,7 @@ const INIT: FormState = {
   workplaceType: "ON_SITE", employmentType: "", seniorityLevel: "NOT_APPLICABLE",
   jobFunctions: [], industries: [],
   description: "", skills: [], skillInput: "", experienceYears: 0,
+  salary: "",
   applicantMode: "email", applicantEmail: "", requireResume: true, externalUrl: "",
   screeningQuestions: [],
 };
@@ -150,6 +152,7 @@ export function PostJobPage() {
           jobType: form.employmentType, workplaceType: form.workplaceType,
           seniorityLevel: form.seniorityLevel, jobFunction: form.jobFunctions.join(","),
           industry: form.industries.join(","), experienceYears: form.experienceYears,
+          salary: form.salary,
           requiredSkills: form.skills.join(","),
           screeningQuestions: form.screeningQuestions,
           applicantMode: form.applicantMode,
@@ -352,6 +355,10 @@ export function PostJobPage() {
 
                   <PField label="Minimum years of experience">
                     <input type="number" min={0} max={30} value={form.experienceYears} onChange={e => set("experienceYears", Number(e.target.value))} className={inp} />
+                  </PField>
+
+                  <PField label="Salary (optional)">
+                    <input value={form.salary} onChange={e => set("salary", e.target.value)} placeholder="e.g. INR 45,000 - 60,000 / month" className={inp} />
                   </PField>
 
                   {/* Skills */}

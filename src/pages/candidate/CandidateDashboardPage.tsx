@@ -21,7 +21,7 @@ import { useCandidateStore } from "../../store/candidateStore";
 import {
   FALLBACK_CANDIDATE_JOBS,
   formatRelativeDate,
-  formatSalaryRange,
+  formatSalaryDisplay,
   normalizeCandidateJob,
   toSavedJobRecord,
   type CandidateJob,
@@ -190,7 +190,7 @@ export function CandidateDashboardPage() {
           </div>
         </div>
 
-        <div className="grid gap-4 xl:grid-cols-[410px_minmax(0,1fr)]">
+        <div className="grid gap-6 xl:grid-cols-[410px_minmax(0,1fr)]">
           <main className="min-w-0">
             <div className="mb-3">
               <h1 className="text-xl font-bold text-foreground">{pageTitle}</h1>
@@ -407,7 +407,7 @@ function JobListItem({
 
       <div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-3">
         <p className="text-xs font-bold uppercase tracking-wide text-foreground/60">
-          {formatSalaryRange(job.salaryMinK, job.salaryMaxK)}
+          {formatSalaryDisplay(job.salary, job.salaryMinK, job.salaryMaxK)}
         </p>
         <button
           type="button"
@@ -459,7 +459,7 @@ function JobPreview({
             <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-foreground/70">
               <span className="rounded-md bg-background px-2.5 py-1">{job.location}</span>
               <span className="rounded-md bg-background px-2.5 py-1">
-                {formatSalaryRange(job.salaryMinK, job.salaryMaxK)}
+                {formatSalaryDisplay(job.salary, job.salaryMinK, job.salaryMaxK)}
               </span>
             </div>
           </div>
@@ -544,6 +544,10 @@ function JobPreview({
               {job.workplaceType?.replace("_", "-") || "Campus role"}
             </p>
             <p>
+              <span className="font-bold text-foreground">Seniority:</span>{" "}
+              {job.seniorityLevel?.replace("_", "-") || "Not specified"}
+            </p>
+            <p>
               <span className="font-bold text-foreground">Status:</span>{" "}
               {job.status === "OPEN" ? "Open" : job.status || "Open"}
             </p>
@@ -556,13 +560,59 @@ function JobPreview({
         <section className="mb-6 border-b border-border pb-6">
           <h3 className="mb-4 text-xl font-bold text-foreground">Base pay range</h3>
           <div className="rounded-xl border border-border bg-background p-5">
-            <p className="text-2xl font-bold text-secondary">{formatSalaryRange(job.salaryMinK, job.salaryMaxK)}</p>
+            <p className="text-2xl font-bold text-secondary">
+              {formatSalaryDisplay(job.salary, job.salaryMinK, job.salaryMaxK)}
+            </p>
             <p className="mt-2 text-sm font-semibold text-foreground">{job.location}</p>
             <p className="mt-1 text-xs leading-5 text-muted-foreground">
               Employer provided salary information. Actual pay may vary by experience, department, and university policy.
             </p>
           </div>
         </section>
+
+        {job.jobFunctions && job.jobFunctions.length > 0 ? (
+          <section className="mb-6 border-b border-border pb-6">
+            <h3 className="mb-3 text-lg font-bold text-foreground">Job functions</h3>
+            <div className="flex flex-wrap gap-2">
+              {job.jobFunctions.slice(0, 6).map((fn) => (
+                <span key={fn} className="rounded-full bg-background px-3 py-1.5 text-xs font-bold text-foreground/70">
+                  {fn}
+                </span>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {job.industries && job.industries.length > 0 ? (
+          <section className="mb-6 border-b border-border pb-6">
+            <h3 className="mb-3 text-lg font-bold text-foreground">Recommended industries</h3>
+            <div className="flex flex-wrap gap-2">
+              {job.industries.slice(0, 6).map((industry) => (
+                <span key={industry} className="rounded-full bg-background px-3 py-1.5 text-xs font-bold text-foreground/70">
+                  {industry}
+                </span>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {job.screeningQuestions && job.screeningQuestions.length > 0 ? (
+          <section className="mb-6 border-b border-border pb-6">
+            <h3 className="mb-3 text-lg font-bold text-foreground">Screening questions</h3>
+            <div className="grid gap-2">
+              {job.screeningQuestions.map((q, idx) => (
+                <div key={`${q.type}-${idx}`} className="rounded-lg border border-border bg-white px-3 py-2 text-xs text-foreground/80">
+                  <span>{q.type}</span>
+                  {q.mustHave ? (
+                    <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                      Must-have
+                    </span>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         {job.requiredSkills && job.requiredSkills.length > 0 ? (
           <section className="mb-6 border-b border-border pb-6">
