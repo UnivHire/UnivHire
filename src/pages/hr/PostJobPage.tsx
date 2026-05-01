@@ -42,26 +42,13 @@ const SCREENING_OPTIONS = [
   "Onsite Work", "Work Experience", "Work Authorization", "Visa Status", "Urgent Hiring Need",
 ];
 
-const CARD_THEME_OPTIONS = ["peach", "mint", "lavender", "sky", "pink", "cream"] as const;
-
-function getCardThemeClass(theme: string) {
-  const map: Record<string, string> = {
-    peach: "card-peach",
-    mint: "card-mint",
-    lavender: "card-lavender",
-    sky: "card-sky",
-    pink: "card-pink",
-    cream: "card-cream",
-  };
-  return map[(theme || "").toLowerCase()] || "card-peach";
-}
 
 /* ─── Types ──────────────────────────────────────────────── */
 interface FormState {
   title: string; universityName: string; location: string;
   workplaceType: string; employmentType: string; seniorityLevel: string;
   jobFunctions: string[]; industries: string[];
-  description: string; skills: string[]; skillInput: string;
+  descriptionSummary: string; responsibilities: string; qualifications: string; skills: string[]; skillInput: string;
   experienceYears: number;
   salary: string;
   applicantMode: "email" | "external";
@@ -72,7 +59,7 @@ const INIT: FormState = {
   title: "", universityName: "", location: "",
   workplaceType: "ON_SITE", employmentType: "", seniorityLevel: "NOT_APPLICABLE",
   jobFunctions: [], industries: [],
-  description: "", skills: [], skillInput: "", experienceYears: 0,
+  descriptionSummary: "", responsibilities: "", qualifications: "", skills: [], skillInput: "", experienceYears: 0,
   salary: "",
   applicantMode: "email", applicantEmail: "", requireResume: true, externalUrl: "",
   screeningQuestions: [],
@@ -87,23 +74,17 @@ export function PostJobPage() {
   const { user, token } = useAuthStore();
   const [step, setStep] = useState(1);
   const [form, setForm] = useState<FormState>({ ...INIT, universityName: user?.university || "" });
-  const [logoPreview, setLogoPreview] = useState("");
-  const [logoFile, setLogoFile] = useState<File | null>(null);
-  const [cardTheme, setCardTheme] = useState<(typeof CARD_THEME_OPTIONS)[number]>("peach");
   const [isPending, setIsPending] = useState(false);
   const [errorStr, setErrorStr] = useState("");
   const [success, setSuccess] = useState(false);
 
-  useEffect(() => () => { if (logoPreview.startsWith("blob:")) URL.revokeObjectURL(logoPreview); }, [logoPreview]);
+  useEffect(() => {
+    if (!user?.university) return;
+    setForm((prev) => ({ ...prev, universityName: user.university || "" }));
+  }, [user?.university]);
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm(p => ({ ...p, [k]: v }));
 
-  const handleLogo = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0]; if (!f) return;
-    if (logoPreview.startsWith("blob:")) URL.revokeObjectURL(logoPreview);
-    setLogoFile(f);
-    setLogoPreview(URL.createObjectURL(f));
-  };
 
   const toggleArr = (key: "jobFunctions" | "industries" | "skills", val: string, max?: number) => {
     const cur = form[key] as string[];
@@ -118,36 +99,81 @@ export function PostJobPage() {
       : [...cur, { type, mustHave: false }]);
   };
 
+  const addSkills = (raw: string) => {
+    const source = raw.trim();
+    if (!source) return;
+
+    let incoming: string[] = [];
+    if (/[\n,;]+/.test(source)) {
+      incoming = source.split(/[\n,;]+/);
+    } else if (source.includes("  ")) {
+      incoming = source.split(/\s{2,}/);
+    } else if (source.includes(" | ")) {
+      incoming = source.split(/\s\|\s/);
+    } else if (source.split(/\s+/).length >= 5) {
+      incoming = source.split(/\s+/);
+    } else {
+      incoming = [source];
+    }
+
+    incoming = incoming.map((item) => item.trim()).filter(Boolean);
+    if (incoming.length === 0) return;
+
+    setForm((prev) => {
+      const next = [...prev.skills];
+      for (const item of incoming) {
+        if (next.length >= 10) break;
+        if (!next.some((skill) => skill.toLowerCase() === item.toLowerCase())) {
+          next.push(item);
+        }
+      }
+      return { ...prev, skills: next };
+    });
+  };
+
   const addSkillFromInput = () => {
-    const s = form.skillInput.trim();
-    if (!s || form.skills.includes(s) || form.skills.length >= 10) return;
-    set("skills", [...form.skills, s]); set("skillInput", "");
+    const raw = form.skillInput.trim();
+    if (!raw) return;
+    addSkills(raw);
+    set("skillInput", "");
   };
 
   const canNext1 =
     form.title &&
-    form.universityName &&
     form.location &&
     form.employmentType &&
-    form.jobFunctions.length > 0 &&
     form.industries.length > 0;
 
   const canNext2 =
-    form.description.trim().length > 0 &&
+    form.descriptionSummary.trim().length > 0 &&
     form.skills.length > 0 && (
       form.applicantMode === "email" ? !!form.applicantEmail : !!form.externalUrl
     );
 
+  const buildJobDescription = () => {
+    const sections: string[] = [];
+    if (form.descriptionSummary.trim()) sections.push(form.descriptionSummary.trim());
+    if (form.responsibilities.trim()) {
+      sections.push(`Key Responsibilities:\n${form.responsibilities.trim()}`);
+    }
+    if (form.qualifications.trim()) {
+      sections.push(`Qualifications:\n${form.qualifications.trim()}`);
+    }
+    return sections.join("\n\n");
+  };
+
   const handleSubmit = async () => {
     setIsPending(true); setErrorStr("");
     try {
+      const organizationName = (user?.university || user?.name || "").trim();
+
       const res = await fetch(`${API_BASE}/api/jobs`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           title: form.title,
-          organizationName: form.universityName,
-          description: form.description,
+          organizationName,
+          description: buildJobDescription(),
           location: form.location,
           jobType: form.employmentType, workplaceType: form.workplaceType,
           seniorityLevel: form.seniorityLevel, jobFunction: form.jobFunctions.join(","),
@@ -159,28 +185,11 @@ export function PostJobPage() {
           applicantEmail: form.applicantEmail,
           requireResume: form.requireResume,
           externalUrl: form.externalUrl,
-          cardTheme,
         }),
       });
 
       const created = await res.json();
       if (!res.ok) { throw new Error(created.error || "Failed"); }
-
-      if (logoFile && created?.id) {
-        const logoForm = new FormData();
-        logoForm.append("logo", logoFile);
-
-        const uploadRes = await fetch(`${API_BASE}/api/jobs/${created.id}/logo`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
-          body: logoForm,
-        });
-
-        if (!uploadRes.ok) {
-          const d = await uploadRes.json().catch(() => ({}));
-          throw new Error(d.error || "Job created, but logo upload failed");
-        }
-      }
 
       setSuccess(true);
     } catch (err: any) { setErrorStr(err.message); }
@@ -198,7 +207,7 @@ export function PostJobPage() {
           <h2 className="mb-2 text-xl font-bold">Job Posted Successfully!</h2>
           <p className="mb-6 text-sm text-muted-foreground">Your posting is live and will appear to candidates after review.</p>
           <div className="flex gap-3 justify-center">
-            <button onClick={() => { setSuccess(false); setStep(1); setForm({ ...INIT, universityName: user?.university || "" }); setLogoPreview(""); setLogoFile(null); setCardTheme("peach"); }} className="rounded-full border border-border px-5 py-2.5 text-sm font-medium hover:bg-background transition">Post Another</button>
+            <button onClick={() => { setSuccess(false); setStep(1); setForm({ ...INIT, universityName: user?.university || "" }); }} className="rounded-full border border-border px-5 py-2.5 text-sm font-medium hover:bg-background transition">Post Another</button>
             <button onClick={() => navigate("/hr/jobs")} className="rounded-full bg-foreground px-5 py-2.5 text-sm font-semibold text-white hover:opacity-80 transition">View My Jobs</button>
           </div>
         </motion.div>
@@ -248,36 +257,11 @@ export function PostJobPage() {
                   <h2 className="text-lg font-bold text-foreground">Step 1: What job do you want to post?</h2>
 
                   <div className="grid grid-cols-2 gap-4">
-                    <PField label="Company / University" required>
-                      <input value={form.universityName} onChange={e => set("universityName", e.target.value)} required placeholder="e.g. GLA University" className={inp} />
-                    </PField>
                     <PField label="Job title" required>
                       <input value={form.title} onChange={e => set("title", e.target.value)} required placeholder="e.g. Office Assistant" className={inp} />
                     </PField>
                   </div>
 
-                  <PField label="University logo (image)">
-                    <input type="file" accept="image/*" onChange={handleLogo} className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground file:mr-3 file:rounded-lg file:border-0 file:bg-secondary file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-secondary-foreground" />
-                  </PField>
-
-                  <PField label="Card color theme">
-                    <div className="flex flex-wrap gap-2">
-                      {CARD_THEME_OPTIONS.map((theme) => {
-                        const active = cardTheme === theme;
-                        return (
-                          <button
-                            key={theme}
-                            type="button"
-                            onClick={() => setCardTheme(theme)}
-                            className={`${getCardThemeClass(theme)} rounded-full border px-3 py-1.5 text-xs font-semibold capitalize transition ${active ? "border-foreground ring-2 ring-foreground/20" : "border-border"
-                              }`}
-                          >
-                            {theme}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </PField>
 
                   <PField label="Job location" required>
                     <input value={form.location} onChange={e => set("location", e.target.value)} required placeholder="e.g. Mathura, Uttar Pradesh, India" className={inp} />
@@ -303,7 +287,7 @@ export function PostJobPage() {
                     </select>
                   </PField>
 
-                  <PField label="Job function (select up to 3)">
+                  <PField label="Job function (optional, select up to 3)">
                     <div className="flex flex-wrap gap-2 pt-1">
                       {JOB_FUNCTIONS.map(fn => {
                         const active = form.jobFunctions.includes(fn);
@@ -349,8 +333,33 @@ export function PostJobPage() {
                   <h2 className="text-lg font-bold text-foreground">Step 2: Description, Skills & Applicant Settings</h2>
 
                   <PField label="Job description" required>
-                    <textarea value={form.description} onChange={e => set("description", e.target.value)} rows={6}
-                      placeholder="Describe the role, responsibilities, qualifications…" className={inp + " resize-none"} />
+                    <textarea
+                      value={form.descriptionSummary}
+                      onChange={e => set("descriptionSummary", e.target.value)}
+                      rows={4}
+                      placeholder="Describe the role overview…"
+                      className={inp + " resize-none"}
+                    />
+                  </PField>
+
+                  <PField label="Key responsibilities">
+                    <textarea
+                      value={form.responsibilities}
+                      onChange={e => set("responsibilities", e.target.value)}
+                      rows={4}
+                      placeholder="List primary responsibilities…"
+                      className={inp + " resize-none"}
+                    />
+                  </PField>
+
+                  <PField label="Qualifications">
+                    <textarea
+                      value={form.qualifications}
+                      onChange={e => set("qualifications", e.target.value)}
+                      rows={4}
+                      placeholder="List required qualifications…"
+                      className={inp + " resize-none"}
+                    />
                   </PField>
 
                   <PField label="Minimum years of experience">
@@ -364,7 +373,17 @@ export function PostJobPage() {
                   {/* Skills */}
                   <PField label={`Add skills (up to 10) — ${form.skills.length}/10`}>
                     <div className="flex gap-2 mb-2">
-                      <input value={form.skillInput} onChange={e => set("skillInput", e.target.value)}
+                      <input
+                        value={form.skillInput}
+                        onChange={e => set("skillInput", e.target.value)}
+                        onPaste={(e) => {
+                          const text = e.clipboardData.getData("text");
+                          if (text && /[\n,;]+/.test(text)) {
+                            e.preventDefault();
+                            addSkills(text);
+                            set("skillInput", "");
+                          }
+                        }}
                         onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addSkillFromInput(); } }}
                         placeholder="Type a skill and press Enter or Add" className={inp} />
                       <button type="button" onClick={addSkillFromInput} disabled={form.skills.length >= 10}
@@ -495,13 +514,13 @@ export function PostJobPage() {
           {/* ── LIVE PREVIEW (sticky) ── */}
           <div className="rounded-2xl bg-white p-5 shadow-sm h-fit sticky top-6">
             <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Live Preview</p>
-            <article className={`${getCardThemeClass(cardTheme)} rounded-xl border border-border p-4`}>
+            <article className="rounded-xl border border-border bg-white p-4">
               <div className="mb-3 flex items-start gap-3">
-                {logoPreview
-                  ? <img src={logoPreview} alt="logo" className="h-11 w-11 rounded-lg object-cover border border-border shrink-0" />
-                  : <div className="flex h-11 w-11 items-center justify-center rounded-lg border border-dashed border-border text-muted-foreground shrink-0"><ImageIcon size={15} /></div>}
+                <div className="flex h-11 w-11 items-center justify-center rounded-lg border border-dashed border-border text-muted-foreground shrink-0">
+                  <ImageIcon size={15} />
+                </div>
                 <div>
-                  <p className="text-[11px] text-muted-foreground">{form.universityName || "University name"}</p>
+                  <p className="text-[11px] text-muted-foreground">{user?.university || "University"}</p>
                   <h3 className="text-sm font-bold text-foreground">{form.title || "Job title preview"}</h3>
                 </div>
               </div>
@@ -515,15 +534,57 @@ export function PostJobPage() {
               {form.location && <div className="mb-2 flex items-center gap-1 text-[11px] text-muted-foreground"><MapPin size={11} />{form.location}</div>}
 
               {form.jobFunctions.length > 0 && (
-                <div className="mb-2 flex flex-wrap gap-1">{form.jobFunctions.map(f => <Tag key={f}>{f}</Tag>)}</div>
+                <div className="mb-2 flex flex-wrap gap-1">
+                  {form.jobFunctions.map((f) => (
+                    <RemovableTag key={f} onRemove={() => toggleArr("jobFunctions", f, 3)}>
+                      {f}
+                    </RemovableTag>
+                  ))}
+                </div>
+              )}
+              {form.industries.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-1">
+                  {form.industries.map((i) => (
+                    <RemovableTag key={i} onRemove={() => toggleArr("industries", i)}>
+                      {i}
+                    </RemovableTag>
+                  ))}
+                </div>
               )}
               {form.skills.length > 0 && (
-                <div className="mb-2 flex flex-wrap gap-1">{form.skills.map(s => <Tag key={s}>{s}</Tag>)}</div>
+                <div className="mb-2 flex flex-wrap gap-1">
+                  {form.skills.map((s) => (
+                    <RemovableTag key={s} onRemove={() => toggleArr("skills", s, 10)}>
+                      {s}
+                    </RemovableTag>
+                  ))}
+                </div>
               )}
 
-              <p className="line-clamp-4 text-xs text-foreground/70">
-                {form.description || "Job description will appear here as you type."}
-              </p>
+              <div className="max-h-28 space-y-2 overflow-hidden text-xs text-foreground/70">
+                {form.descriptionSummary.trim() ? (
+                  <div className="whitespace-pre-wrap">{form.descriptionSummary}</div>
+                ) : null}
+                {form.responsibilities.trim() ? (
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-foreground/60">
+                      Key responsibilities
+                    </p>
+                    <div className="whitespace-pre-wrap">{form.responsibilities}</div>
+                  </div>
+                ) : null}
+                {form.qualifications.trim() ? (
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-foreground/60">
+                      Qualifications
+                    </p>
+                    <div className="whitespace-pre-wrap">{form.qualifications}</div>
+                  </div>
+                ) : null}
+                {!form.descriptionSummary.trim() && !form.responsibilities.trim() && !form.qualifications.trim()
+                  ? "Job description will appear here as you type."
+                  : null}
+              </div>
               {form.experienceYears > 0 && <p className="mt-2 text-[11px] text-muted-foreground">Min. {form.experienceYears} yr{form.experienceYears !== 1 ? "s" : ""} exp.</p>}
             </article>
           </div>
@@ -544,4 +605,18 @@ function PField({ label, children, required }: { label: string; children: React.
 
 function Tag({ children }: { children: React.ReactNode }) {
   return <span className="rounded-full border border-border bg-white px-2 py-0.5 text-[11px] font-medium text-foreground">{children}</span>;
+}
+
+function RemovableTag({ children, onRemove }: { children: React.ReactNode; onRemove: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onRemove}
+      className="inline-flex items-center gap-1 rounded-full border border-border bg-white px-2 py-0.5 text-[11px] font-medium text-foreground transition hover:bg-background"
+      aria-label={`Remove ${String(children)}`}
+    >
+      {children}
+      <span className="text-foreground/60">×</span>
+    </button>
+  );
 }

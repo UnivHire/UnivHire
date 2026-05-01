@@ -18,7 +18,6 @@ import {
   FALLBACK_CANDIDATE_JOBS,
   formatSalaryDisplay,
   normalizeCandidateJob,
-  resolveJobThemeClass,
   toSavedJobRecord,
   type CandidateJob,
 } from "../../lib/candidate";
@@ -41,6 +40,36 @@ export function CandidateJobDetailPage() {
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [errorStr, setErrorStr] = useState("");
 
+  const splitJobDescription = (raw: string | undefined) => {
+    const source = String(raw || "").trim();
+    if (!source) return { descriptionSummary: "", responsibilities: "", qualifications: "" };
+
+    const respRegex = /\bkey responsibilities\s*:\s*/i;
+    const qualRegex = /\bqualifications\s*:\s*/i;
+
+    const respIndex = source.search(respRegex);
+    const qualIndex = source.search(qualRegex);
+
+    let descriptionSummary = source;
+    let responsibilities = "";
+    let qualifications = "";
+
+    if (respIndex !== -1) {
+      descriptionSummary = source.slice(0, respIndex).trim();
+      if (qualIndex !== -1 && qualIndex > respIndex) {
+        responsibilities = source.slice(respIndex, qualIndex).replace(respRegex, "").trim();
+        qualifications = source.slice(qualIndex).replace(qualRegex, "").trim();
+      } else {
+        responsibilities = source.slice(respIndex).replace(respRegex, "").trim();
+      }
+    } else if (qualIndex !== -1) {
+      descriptionSummary = source.slice(0, qualIndex).trim();
+      qualifications = source.slice(qualIndex).replace(qualRegex, "").trim();
+    }
+
+    return { descriptionSummary, responsibilities, qualifications };
+  };
+
   useEffect(() => {
     const fallback = FALLBACK_CANDIDATE_JOBS.find((item) => item.id === id) || null;
 
@@ -58,7 +87,8 @@ export function CandidateJobDetailPage() {
   }, [id]);
 
   const isSaved = useMemo(() => (job ? Boolean(savedJobs[job.id]) : false), [job, savedJobs]);
-  const themeClass = job ? resolveJobThemeClass(job) : "card-peach";
+  const descriptionSections = useMemo(() => splitJobDescription(job?.description), [job?.description]);
+  const themeClass = "bg-white";
 
   useEffect(() => {
     if (!job?.screeningQuestions || job.screeningQuestions.length === 0) {
@@ -243,7 +273,33 @@ export function CandidateJobDetailPage() {
                   <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                     About this role
                   </h2>
-                  <p className="leading-7 text-foreground/80">{job.description}</p>
+                  {descriptionSections.descriptionSummary ? (
+                    <p className="whitespace-pre-wrap leading-7 text-foreground/80">
+                      {descriptionSections.descriptionSummary}
+                    </p>
+                  ) : null}
+
+                  {descriptionSections.responsibilities ? (
+                    <div className="mt-4">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-foreground/60">
+                        Key responsibilities
+                      </p>
+                      <p className="mt-2 whitespace-pre-wrap leading-7 text-foreground/80">
+                        {descriptionSections.responsibilities}
+                      </p>
+                    </div>
+                  ) : null}
+
+                  {descriptionSections.qualifications ? (
+                    <div className="mt-4">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-foreground/60">
+                        Qualifications
+                      </p>
+                      <p className="mt-2 whitespace-pre-wrap leading-7 text-foreground/80">
+                        {descriptionSections.qualifications}
+                      </p>
+                    </div>
+                  ) : null}
                 </section>
 
                 <section>
