@@ -4,14 +4,6 @@ import { useQuery } from "@animaapp/playground-react-sdk";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../store/authStore";
 
-const PASTEL_CLASSES = [
-  "card-peach",
-  "card-mint",
-  "card-lavender",
-  "card-sky",
-  "card-pink",
-  "card-cream",
-];
 
 const FALLBACK_JOBS = [
   {
@@ -207,7 +199,7 @@ export function Hero() {
             {!isPending && (
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {displayJobs.map((job, index) => (
-                  <JobCard key={job.id} job={job} colorClass={PASTEL_CLASSES[index % PASTEL_CLASSES.length]} index={index} />
+                  <JobCard key={job.id} job={job} index={index} />
                 ))}
               </div>
             )}
@@ -225,11 +217,9 @@ const TAG_COLORS = [
 
 function JobCard({
   job,
-  colorClass,
   index,
 }: {
   job: { id: string; title: string; universityName: string; category: string; location: string; description: string; salary?: string };
-  colorClass: string;
   index: number;
 }) {
   const navigate = useNavigate();
@@ -245,7 +235,7 @@ function JobCard({
 
   return (
     <motion.article
-      className={`${colorClass} interactive-card flex flex-col justify-between rounded-2xl p-5`}
+      className="interactive-card flex flex-col justify-between rounded-2xl bg-white p-5"
       initial={{ opacity: 0, y: 18 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, delay: index * 0.06 }}

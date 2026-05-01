@@ -53,7 +53,6 @@ const SCREENING_OPTIONS = [
   "Onsite Work", "Work Experience", "Work Authorization", "Visa Status", "Urgent Hiring Need",
 ];
 
-const CARD_THEME_OPTIONS = ["peach", "mint", "lavender", "sky", "pink", "cream"] as const;
 
 const inp = "w-full rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground outline-none focus:border-foreground/40 transition";
 
@@ -68,7 +67,9 @@ interface FormState {
   seniorityLevel: string;
   jobFunctions: string[];
   industries: string[];
-  description: string;
+  descriptionSummary: string;
+  responsibilities: string;
+  qualifications: string;
   skills: string[];
   skillInput: string;
   experienceYears: number;
@@ -89,7 +90,9 @@ const INIT: FormState = {
   seniorityLevel: "NOT_APPLICABLE",
   jobFunctions: [],
   industries: [],
-  description: "",
+  descriptionSummary: "",
+  responsibilities: "",
+  qualifications: "",
   skills: [],
   skillInput: "",
   experienceYears: 0,
@@ -123,31 +126,47 @@ function parseScreening(raw: unknown): ScreeningQ[] {
   }
 }
 
-function getCardThemeClass(theme: string) {
-  const map: Record<string, string> = {
-    peach: "card-peach",
-    mint: "card-mint",
-    lavender: "card-lavender",
-    sky: "card-sky",
-    pink: "card-pink",
-    cream: "card-cream",
-  };
-  return map[(theme || "").toLowerCase()] || "card-peach";
+function splitJobDescription(raw: unknown) {
+  const source = String(raw || "").trim();
+  if (!source) return { descriptionSummary: "", responsibilities: "", qualifications: "" };
+
+  const respRegex = /\bkey responsibilities\s*:\s*/i;
+  const qualRegex = /\bqualifications\s*:\s*/i;
+
+  const respIndex = source.search(respRegex);
+  const qualIndex = source.search(qualRegex);
+
+  let descriptionSummary = source;
+  let responsibilities = "";
+  let qualifications = "";
+
+  if (respIndex !== -1) {
+    descriptionSummary = source.slice(0, respIndex).trim();
+    if (qualIndex !== -1 && qualIndex > respIndex) {
+      responsibilities = source.slice(respIndex, qualIndex).replace(respRegex, "").trim();
+      qualifications = source.slice(qualIndex).replace(qualRegex, "").trim();
+    } else {
+      responsibilities = source.slice(respIndex).replace(respRegex, "").trim();
+    }
+  } else if (qualIndex !== -1) {
+    descriptionSummary = source.slice(0, qualIndex).trim();
+    qualifications = source.slice(qualIndex).replace(qualRegex, "").trim();
+  }
+
+  return { descriptionSummary, responsibilities, qualifications };
 }
+
 
 export function EditJobPage() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { token } = useAuthStore();
+  const { user, token } = useAuthStore();
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [errorStr, setErrorStr] = useState("");
   const [successStr, setSuccessStr] = useState("");
   const [form, setForm] = useState<FormState>(INIT);
-  const [cardTheme, setCardTheme] = useState<(typeof CARD_THEME_OPTIONS)[number]>("peach");
-  const [logoPreview, setLogoPreview] = useState("");
-  const [logoFile, setLogoFile] = useState<File | null>(null);
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((p) => ({ ...p, [k]: v }));
 
@@ -166,6 +185,7 @@ export function EditJobPage() {
         const data = await response.json();
         if (!response.ok) throw new Error(data?.error || "Failed to load job");
 
+        const sections = splitJobDescription(data?.description);
         const next: FormState = {
           title: String(data?.title || ""),
           universityName: String(data?.organizationName || ""),
@@ -175,7 +195,9 @@ export function EditJobPage() {
           seniorityLevel: String(data?.seniorityLevel || "NOT_APPLICABLE"),
           jobFunctions: splitCsv(data?.jobFunction),
           industries: splitCsv(data?.industry),
-          description: String(data?.description || ""),
+          descriptionSummary: sections.descriptionSummary,
+          responsibilities: sections.responsibilities,
+          qualifications: sections.qualifications,
           skills: splitCsv(data?.requiredSkills),
           skillInput: "",
           experienceYears: Number(data?.experienceYears || 0),
@@ -189,17 +211,7 @@ export function EditJobPage() {
 
         setForm(next);
 
-        const fetchedTheme = String(data?.cardTheme || "").toLowerCase();
-        if (CARD_THEME_OPTIONS.includes(fetchedTheme as any)) {
-          setCardTheme(fetchedTheme as (typeof CARD_THEME_OPTIONS)[number]);
-        }
 
-        if (data?.organizationLogoUrl) {
-          const nextPreview = String(data.organizationLogoUrl).startsWith("http")
-            ? String(data.organizationLogoUrl)
-            : `${API_BASE}${data.organizationLogoUrl}`;
-          setLogoPreview(nextPreview);
-        }
       } catch (err: any) {
         setErrorStr(err?.message || "Failed to load job");
       } finally {
@@ -210,11 +222,6 @@ export function EditJobPage() {
     loadJob();
   }, [id, token]);
 
-  useEffect(() => {
-    return () => {
-      if (logoPreview.startsWith("blob:")) URL.revokeObjectURL(logoPreview);
-    };
-  }, [logoPreview]);
 
   const toggleArr = (key: "jobFunctions" | "industries" | "skills", val: string, max?: number) => {
     const cur = form[key] as string[];
@@ -236,27 +243,63 @@ export function EditJobPage() {
     );
   };
 
+  const addSkills = (raw: string) => {
+    const source = raw.trim();
+    if (!source) return;
+
+    let incoming: string[] = [];
+    if (/[\n,;]+/.test(source)) {
+      incoming = source.split(/[\n,;]+/);
+    } else if (source.includes("  ")) {
+      incoming = source.split(/\s{2,}/);
+    } else if (source.includes(" | ")) {
+      incoming = source.split(/\s\|\s/);
+    } else if (source.split(/\s+/).length >= 5) {
+      incoming = source.split(/\s+/);
+    } else {
+      incoming = [source];
+    }
+
+    incoming = incoming.map((item) => item.trim()).filter(Boolean);
+    if (incoming.length === 0) return;
+
+    setForm((prev) => {
+      const next = [...prev.skills];
+      for (const item of incoming) {
+        if (next.length >= 10) break;
+        if (!next.some((skill) => skill.toLowerCase() === item.toLowerCase())) {
+          next.push(item);
+        }
+      }
+      return { ...prev, skills: next };
+    });
+  };
+
   const addSkillFromInput = () => {
-    const s = form.skillInput.trim();
-    if (!s || form.skills.includes(s) || form.skills.length >= 10) return;
-    set("skills", [...form.skills, s]);
+    const raw = form.skillInput.trim();
+    if (!raw) return;
+    addSkills(raw);
     set("skillInput", "");
   };
 
-  const handleLogo = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (logoPreview.startsWith("blob:")) URL.revokeObjectURL(logoPreview);
-    setLogoFile(file);
-    setLogoPreview(URL.createObjectURL(file));
+  const buildJobDescription = () => {
+    const sections: string[] = [];
+    if (form.descriptionSummary.trim()) sections.push(form.descriptionSummary.trim());
+    if (form.responsibilities.trim()) {
+      sections.push(`Key Responsibilities:\n${form.responsibilities.trim()}`);
+    }
+    if (form.qualifications.trim()) {
+      sections.push(`Qualifications:\n${form.qualifications.trim()}`);
+    }
+    return sections.join("\n\n");
   };
+
 
   const canSave = useMemo(() => {
     if (!form.title.trim()) return false;
-    if (!form.universityName.trim()) return false;
     if (!form.location.trim()) return false;
     if (!form.employmentType) return false;
-    if (!form.description.trim()) return false;
+    if (!form.descriptionSummary.trim()) return false;
     if (!form.applicantEmail.trim() && form.applicantMode === "email") return false;
     if (!form.externalUrl.trim() && form.applicantMode === "external") return false;
     return true;
@@ -274,8 +317,8 @@ export function EditJobPage() {
         method: "PATCH",
         body: JSON.stringify({
           title: form.title,
-          organizationName: form.universityName,
-          description: form.description,
+          organizationName: (user?.university || form.universityName || "").trim(),
+          description: buildJobDescription(),
           location: form.location,
           jobType: form.employmentType,
           workplaceType: form.workplaceType,
@@ -290,24 +333,11 @@ export function EditJobPage() {
           requireResume: form.applicantMode === "email" ? form.requireResume : false,
           externalApplyUrl: form.applicantMode === "external" ? form.externalUrl : "",
           status: form.status,
-          cardTheme,
         }),
       });
 
       const patchData = await patchRes.json().catch(() => ({}));
       if (!patchRes.ok) throw new Error(patchData?.error || "Failed to save job changes");
-
-      if (logoFile) {
-        const logoForm = new FormData();
-        logoForm.append("logo", logoFile);
-        const uploadRes = await fetch(`${API_BASE}/api/jobs/${id}/logo`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
-          body: logoForm,
-        });
-        const uploadData = await uploadRes.json().catch(() => ({}));
-        if (!uploadRes.ok) throw new Error(uploadData?.error || "Updated job but failed to upload logo");
-      }
 
       setSuccessStr("Job post updated successfully.");
     } catch (err: any) {
@@ -364,35 +394,11 @@ export function EditJobPage() {
             <h2 className="text-lg font-bold text-foreground">Job Details</h2>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <PField label="Company / University" required>
-                <input value={form.universityName} onChange={(e) => set("universityName", e.target.value)} className={inp} />
-              </PField>
               <PField label="Job title" required>
                 <input value={form.title} onChange={(e) => set("title", e.target.value)} className={inp} />
               </PField>
             </div>
 
-            <PField label="University logo (image)">
-              <input type="file" accept="image/*" onChange={handleLogo} className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground file:mr-3 file:rounded-lg file:border-0 file:bg-secondary file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-secondary-foreground" />
-            </PField>
-
-            <PField label="Card color theme">
-              <div className="flex flex-wrap gap-2">
-                {CARD_THEME_OPTIONS.map((theme) => {
-                  const active = cardTheme === theme;
-                  return (
-                    <button
-                      key={theme}
-                      type="button"
-                      onClick={() => setCardTheme(theme)}
-                      className={`${getCardThemeClass(theme)} rounded-full border px-3 py-1.5 text-xs font-semibold capitalize transition ${active ? "border-foreground ring-2 ring-foreground/20" : "border-border"}`}
-                    >
-                      {theme}
-                    </button>
-                  );
-                })}
-              </div>
-            </PField>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <PField label="Job location" required>
@@ -424,7 +430,7 @@ export function EditJobPage() {
               </PField>
             </div>
 
-            <PField label="Job function (select up to 3)">
+            <PField label="Job function (optional, select up to 3)">
               <div className="flex flex-wrap gap-2">
                 {JOB_FUNCTIONS.map((fn) => {
                   const active = form.jobFunctions.includes(fn);
@@ -463,7 +469,15 @@ export function EditJobPage() {
             </PField>
 
             <PField label="Job description" required>
-              <textarea value={form.description} onChange={(e) => set("description", e.target.value)} rows={6} className={inp + " resize-none"} />
+              <textarea value={form.descriptionSummary} onChange={(e) => set("descriptionSummary", e.target.value)} rows={4} placeholder="Describe the role overview…" className={inp + " resize-none"} />
+            </PField>
+
+            <PField label="Key responsibilities">
+              <textarea value={form.responsibilities} onChange={(e) => set("responsibilities", e.target.value)} rows={4} placeholder="List primary responsibilities…" className={inp + " resize-none"} />
+            </PField>
+
+            <PField label="Qualifications">
+              <textarea value={form.qualifications} onChange={(e) => set("qualifications", e.target.value)} rows={4} placeholder="List required qualifications…" className={inp + " resize-none"} />
             </PField>
 
             <PField label="Minimum years of experience">
@@ -475,6 +489,14 @@ export function EditJobPage() {
                 <input
                   value={form.skillInput}
                   onChange={(e) => set("skillInput", e.target.value)}
+                  onPaste={(e) => {
+                    const text = e.clipboardData.getData("text");
+                    if (text && /[\n,;]+/.test(text)) {
+                      e.preventDefault();
+                      addSkills(text);
+                      set("skillInput", "");
+                    }
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault();
@@ -588,15 +610,13 @@ export function EditJobPage() {
 
           <div className="h-fit rounded-2xl bg-white p-5 shadow-sm sticky top-6">
             <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Live Preview</p>
-            <article className={`${getCardThemeClass(cardTheme)} rounded-xl border border-border p-4`}>
+            <article className="rounded-xl border border-border bg-white p-4">
               <div className="mb-3 flex items-start gap-3">
-                {logoPreview ? (
-                  <img src={logoPreview} alt="logo" className="h-11 w-11 rounded-lg object-cover border border-border shrink-0" />
-                ) : (
-                  <div className="flex h-11 w-11 items-center justify-center rounded-lg border border-dashed border-border text-muted-foreground shrink-0"><ImageIcon size={15} /></div>
-                )}
+                <div className="flex h-11 w-11 items-center justify-center rounded-lg border border-dashed border-border text-muted-foreground shrink-0">
+                  <ImageIcon size={15} />
+                </div>
                 <div>
-                  <p className="text-[11px] text-muted-foreground">{form.universityName || "University name"}</p>
+                  <p className="text-[11px] text-muted-foreground">{user?.university || form.universityName || "University"}</p>
                   <h3 className="text-sm font-bold text-foreground">{form.title || "Job title preview"}</h3>
                 </div>
               </div>
@@ -610,9 +630,57 @@ export function EditJobPage() {
               </div>
 
               {form.location && <div className="mb-2 flex items-center gap-1 text-[11px] text-muted-foreground"><MapPin size={11} />{form.location}</div>}
-              {form.jobFunctions.length > 0 && <div className="mb-2 flex flex-wrap gap-1">{form.jobFunctions.map((f) => <Tag key={f}>{f}</Tag>)}</div>}
-              {form.skills.length > 0 && <div className="mb-2 flex flex-wrap gap-1">{form.skills.map((s) => <Tag key={s}>{s}</Tag>)}</div>}
-              <p className="line-clamp-4 text-xs text-foreground/70">{form.description || "Job description preview"}</p>
+              {form.jobFunctions.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-1">
+                  {form.jobFunctions.map((f) => (
+                    <RemovableTag key={f} onRemove={() => toggleArr("jobFunctions", f, 3)}>
+                      {f}
+                    </RemovableTag>
+                  ))}
+                </div>
+              )}
+              {form.industries.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-1">
+                  {form.industries.map((i) => (
+                    <RemovableTag key={i} onRemove={() => toggleArr("industries", i)}>
+                      {i}
+                    </RemovableTag>
+                  ))}
+                </div>
+              )}
+              {form.skills.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-1">
+                  {form.skills.map((s) => (
+                    <RemovableTag key={s} onRemove={() => toggleArr("skills", s, 10)}>
+                      {s}
+                    </RemovableTag>
+                  ))}
+                </div>
+              )}
+              <div className="max-h-28 space-y-2 overflow-hidden text-xs text-foreground/70">
+                {form.descriptionSummary.trim() ? (
+                  <div className="whitespace-pre-wrap">{form.descriptionSummary}</div>
+                ) : null}
+                {form.responsibilities.trim() ? (
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-foreground/60">
+                      Key responsibilities
+                    </p>
+                    <div className="whitespace-pre-wrap">{form.responsibilities}</div>
+                  </div>
+                ) : null}
+                {form.qualifications.trim() ? (
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-foreground/60">
+                      Qualifications
+                    </p>
+                    <div className="whitespace-pre-wrap">{form.qualifications}</div>
+                  </div>
+                ) : null}
+                {!form.descriptionSummary.trim() && !form.responsibilities.trim() && !form.qualifications.trim()
+                  ? "Job description preview"
+                  : null}
+              </div>
             </article>
 
             {successStr && (
@@ -638,4 +706,18 @@ function PField({ label, children, required }: { label: string; children: React.
 
 function Tag({ children }: { children: React.ReactNode }) {
   return <span className="rounded-full border border-border bg-white px-2 py-0.5 text-[11px] font-medium text-foreground">{children}</span>;
+}
+
+function RemovableTag({ children, onRemove }: { children: React.ReactNode; onRemove: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onRemove}
+      className="inline-flex items-center gap-1 rounded-full border border-border bg-white px-2 py-0.5 text-[11px] font-medium text-foreground transition hover:bg-background"
+      aria-label={`Remove ${String(children)}`}
+    >
+      {children}
+      <span className="text-foreground/60">×</span>
+    </button>
+  );
 }

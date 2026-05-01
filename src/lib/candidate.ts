@@ -157,28 +157,6 @@ export function normalizeCandidateJob(raw: any): CandidateJob {
   };
 }
 
-const THEME_CLASS_BY_KEY: Record<string, string> = {
-  peach: "card-peach",
-  mint: "card-mint",
-  lavender: "card-lavender",
-  sky: "card-sky",
-  pink: "card-pink",
-  cream: "card-cream",
-};
-
-const THEME_KEYS = Object.keys(THEME_CLASS_BY_KEY);
-
-export function resolveJobThemeClass(job: CandidateJob): string {
-  const selected = (job.cardTheme || "").toLowerCase();
-  if (selected in THEME_CLASS_BY_KEY) {
-    return THEME_CLASS_BY_KEY[selected];
-  }
-
-  const base = job.id || job.title || "job";
-  const hash = Array.from(base).reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
-  const key = THEME_KEYS[hash % THEME_KEYS.length];
-  return THEME_CLASS_BY_KEY[key];
-}
 
 export function toSavedJobRecord(job: CandidateJob): Omit<SavedJobRecord, "savedAt"> {
   return {

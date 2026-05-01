@@ -1,7 +1,7 @@
 import { Bookmark, BookmarkCheck, Building2, MapPin, ShieldCheck } from "lucide-react";
 import { motion } from "framer-motion";
 import type { CandidateJob } from "../../lib/candidate";
-import { formatRelativeDate, formatSalaryDisplay, resolveJobThemeClass } from "../../lib/candidate";
+import { formatRelativeDate, formatSalaryDisplay } from "../../lib/candidate";
 
 export function CandidateJobCard({
   job,
@@ -16,7 +16,6 @@ export function CandidateJobCard({
   onToggleSave: () => void;
   onOpen: () => void;
 }) {
-  const cardColor = resolveJobThemeClass(job);
   const tags = [
     job.workplaceType ? job.workplaceType.replace("_", "-") : null,
     job.category,
@@ -26,7 +25,7 @@ export function CandidateJobCard({
 
   return (
     <motion.article
-      className={`${cardColor} flex h-full flex-col justify-between rounded-2xl p-5 shadow-sm transition duration-300 hover:scale-[1.01] hover:shadow-lg`}
+      className="flex h-full flex-col justify-between rounded-2xl bg-white p-5 shadow-sm transition duration-300 hover:scale-[1.01] hover:shadow-lg"
       initial={{ opacity: 0, y: 18 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: index * 0.04 }}

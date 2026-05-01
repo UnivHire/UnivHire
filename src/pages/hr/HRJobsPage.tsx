@@ -8,23 +8,6 @@ import { useAuthStore } from "../../store/authStore";
 
 const ROLE_FILTERS = ["All", "Trainer", "Driver", "Faculty", "Security", "Peon", "Operations", "Admin Staff", "Other"];
 
-const THEME_CLASS_BY_KEY: Record<string, string> = {
-  peach: "card-peach",
-  mint: "card-mint",
-  lavender: "card-lavender",
-  sky: "card-sky",
-  pink: "card-pink",
-  cream: "card-cream",
-};
-
-function resolveThemeClass(job: any) {
-  const selected = String(job?.cardTheme || "").toLowerCase();
-  if (selected && THEME_CLASS_BY_KEY[selected]) return THEME_CLASS_BY_KEY[selected];
-  const keys = Object.keys(THEME_CLASS_BY_KEY);
-  const base = String(job?.id || job?.title || "job");
-  const hash = Array.from(base).reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
-  return THEME_CLASS_BY_KEY[keys[hash % keys.length]];
-}
 
 function formatPostedDate(iso?: string) {
   if (!iso) return "Recently";
@@ -178,7 +161,7 @@ export function HRJobsPage() {
             {filteredAndSortedJobs.map((j, i) => (
               <motion.div
                 key={j.id}
-                className={`${resolveThemeClass(j)} rounded-2xl border border-border p-5 shadow-sm`}
+                className="rounded-2xl border border-border bg-white p-5 shadow-sm"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.04 }}
