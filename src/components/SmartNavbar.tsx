@@ -6,7 +6,7 @@ import {
   LogOut, LayoutDashboard, User, FileText, Bookmark as BookmarkIcon, Moon, Sun,
   Search, Briefcase, BellRing, CheckCheck,
 } from "lucide-react";
-import { useAuthStore } from "../store/authStore";
+import { canWriteHr, isHrRole, useAuthStore } from "../store/authStore";
 import { useCandidateStore } from "../store/candidateStore";
 
 /** Items shown when NOT logged in (landing page visitors) */
@@ -29,6 +29,8 @@ const HR_NAV = [
   { label: "Post Job", href: "/hr/post-job" },
   { label: "My Jobs", href: "/hr/jobs" },
   { label: "Applications", href: "/hr/applications" },
+  { label: "Pipeline", href: "/hr/pipeline" },
+  { label: "Email Templates", href: "/hr/email-templates" },
 ];
 
 const ROLE_OPTIONS = ["Role type", "Faculty", "Operations", "Security", "Driver"];
@@ -63,7 +65,8 @@ export function SmartNavbar() {
     markNotificationRead,
   } = useCandidateStore();
   const isLoggedIn = !!token;
-  const isHrLike = role === "hr" || role === "admin";
+  const isHrLike = isHrRole(role);
+  const canWrite = canWriteHr(role);
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [avatarOpen, setAvatarOpen] = useState(false);
@@ -165,7 +168,11 @@ export function SmartNavbar() {
     setAvatarOpen(false);
   };
 
-  const navItems = !isLoggedIn ? PUBLIC_NAV : isHrLike ? HR_NAV : CANDIDATE_NAV;
+  const navItems = !isLoggedIn
+    ? PUBLIC_NAV
+    : isHrLike
+      ? HR_NAV.filter((item) => (item.href === "/hr/post-job" ? canWrite : true))
+      : CANDIDATE_NAV;
   const unreadCount = useMemo(
     () => notifications.filter((item) => !item.read).length,
     [notifications]

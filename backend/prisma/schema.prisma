@@ -16,7 +16,7 @@ model User {
   email        String        @unique
   passwordHash String?
   name         String
-  role         String        // 'CANDIDATE', 'HR', 'ADMIN'
+  role         String        // 'CANDIDATE', 'HR', 'ADMIN', 'ADMIN_HR', 'SUB_HR'
   university   String?
   avatar       String?
 
@@ -48,6 +48,13 @@ model User {
   applications Application[]
   savedJobs    SavedJob[]
   invitesSent  Invite[]      @relation("InviteSender")
+  hrSaves       HRCandidateSave[] @relation("HRCandidateSaveHR")
+  candidateSaves HRCandidateSave[] @relation("HRCandidateSaveCandidate")
+  hrNotes       ApplicationNote[]
+  emailTemplates EmailTemplate[]
+
+  @@index([name])
+  @@index([email])
 }
 
 model Job {
@@ -76,6 +83,10 @@ model Job {
   createdAt           DateTime      @default(now())
   applications        Application[]
   savedBy             SavedJob[]
+  hrSaves             HRCandidateSave[]
+
+  @@index([title])
+  @@index([jobType])
 }
 
 model Application {
@@ -90,8 +101,57 @@ model Application {
   resumeUrl        String?
   status           String   @default("PENDING")
   appliedAt        DateTime @default(now())
+  notes            ApplicationNote[]
+  hrSaves          HRCandidateSave[]
 
   @@unique([jobId, candidateId])
+  @@index([status])
+  @@index([appliedAt])
+}
+
+model HRCandidateSave {
+  id            String   @id @default(uuid())
+  hrId          String
+  hr            User     @relation("HRCandidateSaveHR", fields: [hrId], references: [id])
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id])
+  candidateId   String
+  candidate     User     @relation("HRCandidateSaveCandidate", fields: [candidateId], references: [id])
+  jobId         String
+  job           Job      @relation(fields: [jobId], references: [id])
+  savedAt       DateTime @default(now())
+
+  @@unique([hrId, applicationId])
+  @@index([candidateId])
+  @@index([jobId])
+}
+
+model ApplicationNote {
+  id            String   @id @default(uuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id])
+  hrId          String
+  hr            User     @relation(fields: [hrId], references: [id])
+  note          String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([applicationId])
+  @@index([hrId])
+}
+
+model EmailTemplate {
+  id        String   @id @default(uuid())
+  hrId      String
+  hr        User     @relation(fields: [hrId], references: [id])
+  name      String
+  subject   String
+  body      String
+  type      String   @default("CUSTOM")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([hrId])
 }
 
 model SavedJob {

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { GraduationCap, Eye, EyeOff, AlertCircle } from "lucide-react";
-import { useAuthStore, UserRole, AuthUser } from "../store/authStore";
+import { useAuthStore, UserRole, AuthUser, isHrRole, normalizeRole } from "../store/authStore";
 import { GoogleLoginButton } from "../components/GoogleLoginButton";
 
 export function LoginPage() {
@@ -24,11 +24,11 @@ export function LoginPage() {
 
     const destination =
       returnUrl ||
-      (role === "candidate"
-        ? "/dashboard"
-        : role === "hr"
+      (role === "admin"
+        ? "/admin"
+        : isHrRole(role)
         ? "/hr/dashboard"
-        : "/admin");
+        : "/dashboard");
 
     navigate(destination, { replace: true });
   }, [navigate, returnUrl, role, token]);
@@ -70,7 +70,7 @@ export function LoginPage() {
       // Successful login
       const { token, user } = data;
       // Normalizing the role format (uppercase from DB -> lowercase for frontend if needed)
-      const role = user.role.toLowerCase() as UserRole;
+      const role = normalizeRole(user.role);
       
       document.cookie = `univhire_token=${token}; path=/`;
       document.cookie = `univhire_role=${role}; path=/`;
@@ -78,11 +78,11 @@ export function LoginPage() {
 
       const dest = returnUrl
         ? returnUrl
-        : role === "candidate"
-        ? "/dashboard"
-        : role === "hr"
+        : role === "admin"
+        ? "/admin"
+        : isHrRole(role)
         ? "/hr/dashboard"
-        : "/admin";
+        : "/dashboard";
 
       navigate(dest, { replace: true });
     } catch (err: any) {
@@ -167,15 +167,15 @@ export function LoginPage() {
 
         <GoogleLoginButton
           onSuccess={(data) => {
-            const nextRole = String(data.user.role || "").toLowerCase() as UserRole;
+            const nextRole = normalizeRole(data.user.role);
             setAuth(data.token, nextRole, { ...data.user, roleType: data.user.role });
             const dest = returnUrl
               ? returnUrl
-              : nextRole === "candidate"
-              ? "/dashboard"
-              : nextRole === "hr"
+              : nextRole === "admin"
+              ? "/admin"
+              : isHrRole(nextRole)
               ? "/hr/dashboard"
-              : "/admin";
+              : "/dashboard";
             navigate(dest, { replace: true });
           }}
           onError={(message) => setError(message)}

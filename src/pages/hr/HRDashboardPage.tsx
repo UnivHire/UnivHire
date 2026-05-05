@@ -72,7 +72,7 @@ export function HRDashboardPage() {
   const stats = [
     { icon: <Briefcase size={20} />, label: "Active Jobs", value: jobs?.length || 0, color: "card-peach" },
     { icon: <Users size={20} />, label: "Total Applicants", value: applications?.length || 0, color: "card-mint" },
-    { icon: <ClipboardList size={20} />, label: "Shortlisted", value: applications?.filter((a) => String(a.status).toUpperCase() === "SHORTLISTED").length || 0, color: "card-lavender" },
+    { icon: <ClipboardList size={20} />, label: "In Process", value: applications?.filter((a) => ["SHORTLISTED", "INTERVIEW", "SELECTED"].includes(String(a.status).toUpperCase())).length || 0, color: "card-lavender" },
     { icon: <TrendingUp size={20} />, label: "Hired", value: applications?.filter((a) => String(a.status).toUpperCase() === "HIRED").length || 0, color: "card-sky" },
   ];
 
