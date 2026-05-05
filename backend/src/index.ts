@@ -12,6 +12,7 @@ import { authenticateToken } from "./middleware/authenticate";
 import { verifyAuthToken, signAuthToken } from "./lib/jwt";
 import { CORS_ORIGIN } from "./config";
 import { setAuthCookie } from "./lib/cookies";
+import { sendEmail } from "./lib/mailer";
 
 dotenv.config();
 
@@ -40,6 +41,15 @@ type JobTheme = "peach" | "mint" | "lavender" | "sky" | "pink" | "cream";
 type JobMedia = { organizationLogoUrl?: string; cardTheme?: JobTheme };
 
 const allowedThemes = new Set<JobTheme>(["peach", "mint", "lavender", "sky", "pink", "cream"]);
+
+const HR_WRITE_ROLES = new Set(["HR", "ADMIN_HR", "ADMIN"]);
+const HR_VIEW_ROLES = new Set(["HR", "ADMIN_HR", "SUB_HR", "ADMIN"]);
+const ADMIN_ROLES = new Set(["ADMIN"]);
+const APPLICATION_STATUSES = ["PENDING", "SHORTLISTED", "INTERVIEW", "SELECTED", "REJECTED", "HIRED"];
+
+function renderTemplate(source: string, data: Record<string, string>) {
+  return source.replace(/{{\s*([a-zA-Z0-9_]+)\s*}}/g, (_match, key) => data[key] || "");
+}
 
 function normalizeTheme(value: unknown): JobTheme | undefined {
   const raw = String(value || "").toLowerCase() as JobTheme;
@@ -133,19 +143,34 @@ app.get("/api/jobs", async (req: any, res: any) => {
     const wantsAll = String(req.query.includeClosed || "") === "1";
 
     let viewerRole = "";
+    let viewerId = "";
     if (token) {
       try {
         const decoded = verifyAuthToken(token);
         viewerRole = String(decoded?.role || "").toUpperCase();
+        viewerId = String(decoded?.id || "");
       } catch {
         viewerRole = "";
       }
     }
 
-    const canSeeClosed = wantsAll && (viewerRole === "HR" || viewerRole === "ADMIN");
+    const canSeeClosed = wantsAll && HR_VIEW_ROLES.has(viewerRole);
+    const filters: any[] = [];
+    if (!canSeeClosed) filters.push({ status: "OPEN" });
+
+    if (viewerRole === "HR" || viewerRole === "ADMIN_HR") {
+      filters.push({ hrId: viewerId });
+    } else if (viewerRole === "SUB_HR" && viewerId) {
+      const viewer = await prisma.user.findUnique({ where: { id: viewerId }, select: { university: true } });
+      if (viewer?.university) {
+        filters.push({ hr: { university: viewer.university } });
+      }
+    }
+
+    const where = filters.length ? { AND: filters } : undefined;
 
     const jobs = await prisma.job.findMany({
-      where: canSeeClosed ? undefined : { status: "OPEN" },
+      where,
       include: { hr: { select: { name: true, email: true, university: true } } },
       orderBy: { createdAt: 'desc' }
     });
@@ -183,9 +208,15 @@ app.get("/api/jobs/:id", async (req: any, res: any) => {
       return res.status(404).json({ error: "Job not found" });
     }
 
-    const isOwnerHr = viewer.role === "HR" && viewer.id === job.hrId;
+    const isOwnerHr = (viewer.role === "HR" || viewer.role === "ADMIN_HR") && viewer.id === job.hrId;
     const isAdmin = viewer.role === "ADMIN";
-    if (job.status !== "OPEN" && !isOwnerHr && !isAdmin) {
+    let isSubHr = false;
+    if (viewer.role === "SUB_HR" && viewer.id) {
+      const viewerUser = await prisma.user.findUnique({ where: { id: viewer.id }, select: { university: true } });
+      isSubHr = Boolean(viewerUser?.university && viewerUser.university === job.hr?.university);
+    }
+
+    if (job.status !== "OPEN" && !isOwnerHr && !isAdmin && !isSubHr) {
       return res.status(404).json({ error: "Job not found" });
     }
 
@@ -198,7 +229,7 @@ app.get("/api/jobs/:id", async (req: any, res: any) => {
 // 5. Jobs: Create a job (HR Only)
 app.post("/api/jobs", authenticateToken, async (req: any, res: any) => {
   try {
-    if (req.user.role !== "HR" && req.user.role !== "ADMIN") {
+    if (!HR_WRITE_ROLES.has(String(req.user.role || "").toUpperCase())) {
       return res.status(403).json({ error: "Forbidden. HR access required." });
     }
 
@@ -220,7 +251,7 @@ app.post("/api/jobs", authenticateToken, async (req: any, res: any) => {
       return res.status(401).json({ error: "Session is invalid. Please login again." });
     }
 
-    if (hrUser.role !== "HR" && hrUser.role !== "ADMIN") {
+    if (!HR_WRITE_ROLES.has(String(hrUser.role || "").toUpperCase())) {
       return res.status(403).json({ error: "Your account does not have HR access." });
     }
 
@@ -306,7 +337,8 @@ app.post("/api/jobs", authenticateToken, async (req: any, res: any) => {
 // 5b. Jobs: Update a job (HR/Admin, owner for HR)
 app.patch("/api/jobs/:id", authenticateToken, async (req: any, res: any) => {
   try {
-    if (req.user.role !== "HR" && req.user.role !== "ADMIN") {
+    const role = String(req.user.role || "").toUpperCase();
+    if (!HR_WRITE_ROLES.has(role)) {
       return res.status(403).json({ error: "Forbidden. HR access required." });
     }
 
@@ -315,7 +347,7 @@ app.patch("/api/jobs/:id", authenticateToken, async (req: any, res: any) => {
       return res.status(404).json({ error: "Job not found" });
     }
 
-    if (req.user.role === "HR" && existingJob.hrId !== req.user.id) {
+    if ((role === "HR" || role === "ADMIN_HR") && existingJob.hrId !== req.user.id) {
       return res.status(403).json({ error: "You can only update your own jobs." });
     }
 
@@ -374,7 +406,8 @@ app.patch("/api/jobs/:id", authenticateToken, async (req: any, res: any) => {
 
 app.post("/api/jobs/:id/logo", authenticateToken, uploadJobLogo.single("logo"), async (req: any, res: any) => {
   try {
-    if (req.user.role !== "HR" && req.user.role !== "ADMIN") {
+    const role = String(req.user.role || "").toUpperCase();
+    if (!HR_WRITE_ROLES.has(role)) {
       return res.status(403).json({ error: "Forbidden. HR access required." });
     }
 
@@ -387,7 +420,7 @@ app.post("/api/jobs/:id/logo", authenticateToken, uploadJobLogo.single("logo"), 
       return res.status(404).json({ error: "Job not found" });
     }
 
-    if (req.user.role !== "ADMIN" && job.hrId !== req.user.id) {
+    if (role !== "ADMIN" && job.hrId !== req.user.id) {
       return res.status(403).json({ error: "You can upload logos only for your own jobs" });
     }
 
@@ -468,16 +501,64 @@ app.get("/api/applications", authenticateToken, async (req: any, res: any) => {
       return res.json(applications);
     }
 
-    if (req.user.role === "HR") {
+    const role = String(req.user.role || "").toUpperCase();
+    if (HR_VIEW_ROLES.has(role) && role !== "ADMIN") {
+      const q = String(req.query.q || "").trim();
+      const status = String(req.query.status || "").toUpperCase();
+      const jobType = String(req.query.jobType || "").trim();
+      const savedOnly = String(req.query.saved || "") === "1";
+
+      const filters: any[] = [];
+      if (role === "HR" || role === "ADMIN_HR") {
+        filters.push({ job: { hrId: req.user.id } });
+      } else if (role === "SUB_HR") {
+        const viewer = await prisma.user.findUnique({ where: { id: req.user.id }, select: { university: true } });
+        if (viewer?.university) {
+          filters.push({ job: { hr: { university: viewer.university } } });
+        }
+      }
+
+      if (APPLICATION_STATUSES.includes(status)) {
+        filters.push({ status });
+      }
+
+      if (jobType) {
+        filters.push({ job: { jobType } });
+      }
+
+      if (savedOnly) {
+        filters.push({ hrSaves: { some: { hrId: req.user.id } } });
+      }
+
+      if (q) {
+        filters.push({
+          OR: [
+            { candidate: { name: { contains: q, mode: "insensitive" } } },
+            { candidate: { email: { contains: q, mode: "insensitive" } } },
+            { candidate: { skills: { contains: q, mode: "insensitive" } } },
+            { job: { title: { contains: q, mode: "insensitive" } } },
+            { job: { jobType: { contains: q, mode: "insensitive" } } },
+          ],
+        });
+      }
+
       const applications = await prisma.application.findMany({
-        where: { job: { hrId: req.user.id } },
+        where: filters.length ? { AND: filters } : undefined,
         include: {
           job: { select: { id: true, title: true, location: true, jobType: true } },
-          candidate: { select: { id: true, name: true, email: true } },
+          candidate: { select: { id: true, name: true, email: true, skills: true } },
+          hrSaves: { where: { hrId: req.user.id }, select: { id: true } },
+          _count: { select: { notes: true } },
         },
         orderBy: { appliedAt: "desc" },
       });
-      return res.json(applications);
+      return res.json(
+        applications.map((app) => ({
+          ...app,
+          isSaved: app.hrSaves?.length > 0,
+          notesCount: app._count?.notes || 0,
+        }))
+      );
     }
 
     const applications = await prisma.application.findMany({
@@ -506,9 +587,12 @@ app.get("/api/applications/:id", authenticateToken, async (req: any, res: any) =
             location: true,
             jobType: true,
             hrId: true,
+            hr: { select: { id: true, university: true } },
           },
         },
-        candidate: { select: { id: true, name: true, email: true } },
+        candidate: { select: { id: true, name: true, email: true, skills: true } },
+        hrSaves: { where: { hrId: req.user.id }, select: { id: true } },
+        notes: { orderBy: { createdAt: "desc" } },
       },
     });
 
@@ -520,8 +604,17 @@ app.get("/api/applications/:id", authenticateToken, async (req: any, res: any) =
       return res.status(403).json({ error: "Forbidden" });
     }
 
-    if (req.user.role === "HR" && application.job.hrId !== req.user.id) {
-      return res.status(403).json({ error: "Forbidden" });
+    const role = String(req.user.role || "").toUpperCase();
+    if (role === "HR" || role === "ADMIN_HR") {
+      if (application.job.hrId !== req.user.id) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+    }
+    if (role === "SUB_HR") {
+      const viewer = await prisma.user.findUnique({ where: { id: req.user.id }, select: { university: true } });
+      if (!viewer?.university || viewer.university !== application.job.hr?.university) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
     }
 
     return res.json(application);
@@ -533,13 +626,13 @@ app.get("/api/applications/:id", authenticateToken, async (req: any, res: any) =
 // 6c. Applications: Update status (HR/Admin)
 app.patch("/api/applications/:id/status", authenticateToken, async (req: any, res: any) => {
   try {
-    if (req.user.role !== "HR" && req.user.role !== "ADMIN") {
+    const role = String(req.user.role || "").toUpperCase();
+    if (!HR_WRITE_ROLES.has(role)) {
       return res.status(403).json({ error: "Forbidden. HR access required." });
     }
 
-    const allowedStatuses = ["PENDING", "SHORTLISTED", "REJECTED", "HIRED"];
     const nextStatus = String(req.body.status || "").toUpperCase();
-    if (!allowedStatuses.includes(nextStatus)) {
+    if (!APPLICATION_STATUSES.includes(nextStatus)) {
       return res.status(400).json({ error: "Invalid status" });
     }
 
@@ -552,7 +645,7 @@ app.patch("/api/applications/:id/status", authenticateToken, async (req: any, re
       return res.status(404).json({ error: "Application not found" });
     }
 
-    if (req.user.role === "HR" && existing.job.hrId !== req.user.id) {
+    if ((role === "HR" || role === "ADMIN_HR") && existing.job.hrId !== req.user.id) {
       return res.status(403).json({ error: "You can only update applications for your jobs." });
     }
 
@@ -561,16 +654,308 @@ app.patch("/api/applications/:id/status", authenticateToken, async (req: any, re
       data: { status: nextStatus },
     });
 
+    const shouldSendEmail = Boolean(req.body?.sendEmail);
+    if (shouldSendEmail) {
+      const templateId = String(req.body?.templateId || "").trim();
+      const appWithRelations = await prisma.application.findUnique({
+        where: { id: req.params.id },
+        include: { job: true, candidate: true },
+      });
+
+      if (appWithRelations?.candidate?.email) {
+        const template = templateId
+          ? await prisma.emailTemplate.findFirst({
+              where: {
+                id: templateId,
+                OR: [
+                  { hrId: req.user.id },
+                  { hrId: appWithRelations.job?.hrId || "" },
+                ],
+              },
+            })
+          : null;
+
+        const data = {
+          candidateName: String(appWithRelations.candidate?.name || "Candidate"),
+          jobTitle: String(appWithRelations.job?.title || "Job"),
+          status: nextStatus,
+        };
+
+        const subject = template
+          ? renderTemplate(template.subject, data)
+          : `Update on your ${data.jobTitle} application`;
+        const body = template
+          ? renderTemplate(template.body, data)
+          : `Hello ${data.candidateName},\n\nYour application status is now ${data.status}.\n\nRegards,\nUnivHire`;
+
+        try {
+          await sendEmail({ to: appWithRelations.candidate.email, subject, text: body });
+        } catch (err) {
+          console.error("Email send failed:", err);
+        }
+      }
+    }
+
     return res.json(updated);
   } catch (error) {
     return res.status(500).json({ error: "Failed to update application status" });
   }
 });
 
+// 6d. HR: Save/unsave candidates (shortlist bucket)
+app.get("/api/hr/saved-candidates", authenticateToken, async (req: any, res: any) => {
+  try {
+    const role = String(req.user.role || "").toUpperCase();
+    if (!HR_VIEW_ROLES.has(role)) {
+      return res.status(403).json({ error: "Forbidden. HR access required." });
+    }
+
+    const saved = await prisma.hRCandidateSave.findMany({
+      where: { hrId: req.user.id },
+      include: {
+        application: {
+          include: {
+            job: { select: { id: true, title: true, location: true, jobType: true } },
+            candidate: { select: { id: true, name: true, email: true, skills: true } },
+          },
+        },
+      },
+      orderBy: { savedAt: "desc" },
+    });
+
+    return res.json(saved.map((s) => ({ ...s.application, isSaved: true })));
+  } catch {
+    return res.status(500).json({ error: "Failed to fetch saved candidates" });
+  }
+});
+
+app.post("/api/hr/saved-candidates", authenticateToken, async (req: any, res: any) => {
+  try {
+    const role = String(req.user.role || "").toUpperCase();
+    if (!HR_WRITE_ROLES.has(role)) {
+      return res.status(403).json({ error: "Forbidden. HR access required." });
+    }
+
+    const applicationId = String(req.body?.applicationId || "").trim();
+    if (!applicationId) return res.status(400).json({ error: "applicationId is required" });
+
+    const application = await prisma.application.findUnique({
+      where: { id: applicationId },
+      include: { job: { select: { id: true, hrId: true } } },
+    });
+    if (!application) return res.status(404).json({ error: "Application not found" });
+    if ((role === "HR" || role === "ADMIN_HR") && application.job.hrId !== req.user.id) {
+      return res.status(403).json({ error: "You can only save candidates for your jobs." });
+    }
+
+    const saved = await prisma.hRCandidateSave.upsert({
+      where: { hrId_applicationId: { hrId: req.user.id, applicationId } },
+      create: {
+        hrId: req.user.id,
+        applicationId,
+        candidateId: application.candidateId,
+        jobId: application.jobId,
+      },
+      update: {},
+    });
+
+    return res.status(201).json(saved);
+  } catch {
+    return res.status(500).json({ error: "Failed to save candidate" });
+  }
+});
+
+app.delete("/api/hr/saved-candidates/:applicationId", authenticateToken, async (req: any, res: any) => {
+  try {
+    const role = String(req.user.role || "").toUpperCase();
+    if (!HR_WRITE_ROLES.has(role)) {
+      return res.status(403).json({ error: "Forbidden. HR access required." });
+    }
+    await prisma.hRCandidateSave.delete({
+      where: { hrId_applicationId: { hrId: req.user.id, applicationId: req.params.applicationId } },
+    });
+    return res.json({ ok: true });
+  } catch {
+    return res.status(500).json({ error: "Failed to unsave candidate" });
+  }
+});
+
+// 6e. HR: Application notes
+app.post("/api/hr/applications/:id/notes", authenticateToken, async (req: any, res: any) => {
+  try {
+    const role = String(req.user.role || "").toUpperCase();
+    if (!HR_WRITE_ROLES.has(role)) {
+      return res.status(403).json({ error: "Forbidden. HR access required." });
+    }
+    const note = String(req.body?.note || "").trim();
+    if (!note) return res.status(400).json({ error: "note is required" });
+
+    const application = await prisma.application.findUnique({
+      where: { id: req.params.id },
+      include: { job: { select: { hrId: true } } },
+    });
+    if (!application) return res.status(404).json({ error: "Application not found" });
+    if ((role === "HR" || role === "ADMIN_HR") && application.job.hrId !== req.user.id) {
+      return res.status(403).json({ error: "You can only add notes to your applications." });
+    }
+
+    const created = await prisma.applicationNote.create({
+      data: { applicationId: application.id, hrId: req.user.id, note },
+    });
+    return res.status(201).json(created);
+  } catch {
+    return res.status(500).json({ error: "Failed to add note" });
+  }
+});
+
+app.patch("/api/hr/notes/:id", authenticateToken, async (req: any, res: any) => {
+  try {
+    const role = String(req.user.role || "").toUpperCase();
+    if (!HR_WRITE_ROLES.has(role)) {
+      return res.status(403).json({ error: "Forbidden. HR access required." });
+    }
+    const note = String(req.body?.note || "").trim();
+    if (!note) return res.status(400).json({ error: "note is required" });
+
+    const existing = await prisma.applicationNote.findUnique({ where: { id: req.params.id } });
+    if (!existing) return res.status(404).json({ error: "Note not found" });
+    if (existing.hrId !== req.user.id && role !== "ADMIN") {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const updated = await prisma.applicationNote.update({ where: { id: req.params.id }, data: { note } });
+    return res.json(updated);
+  } catch {
+    return res.status(500).json({ error: "Failed to update note" });
+  }
+});
+
+app.delete("/api/hr/notes/:id", authenticateToken, async (req: any, res: any) => {
+  try {
+    const role = String(req.user.role || "").toUpperCase();
+    if (!HR_WRITE_ROLES.has(role)) {
+      return res.status(403).json({ error: "Forbidden. HR access required." });
+    }
+    const existing = await prisma.applicationNote.findUnique({ where: { id: req.params.id } });
+    if (!existing) return res.status(404).json({ error: "Note not found" });
+    if (existing.hrId !== req.user.id && role !== "ADMIN") {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    await prisma.applicationNote.delete({ where: { id: req.params.id } });
+    return res.json({ ok: true });
+  } catch {
+    return res.status(500).json({ error: "Failed to delete note" });
+  }
+});
+
+// 6f. HR: Bulk update status
+app.post("/api/hr/applications/bulk-status", authenticateToken, async (req: any, res: any) => {
+  try {
+    const role = String(req.user.role || "").toUpperCase();
+    if (!HR_WRITE_ROLES.has(role)) {
+      return res.status(403).json({ error: "Forbidden. HR access required." });
+    }
+
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(String) : [];
+    const status = String(req.body?.status || "").toUpperCase();
+    if (!ids.length) return res.status(400).json({ error: "ids are required" });
+    if (!APPLICATION_STATUSES.includes(status)) return res.status(400).json({ error: "Invalid status" });
+
+    const apps = await prisma.application.findMany({
+      where: { id: { in: ids } },
+      include: { job: { select: { hrId: true } } },
+    });
+
+    if ((role === "HR" || role === "ADMIN_HR") && apps.some((a) => a.job.hrId !== req.user.id)) {
+      return res.status(403).json({ error: "Some applications are outside your jobs." });
+    }
+
+    await prisma.application.updateMany({ where: { id: { in: ids } }, data: { status } });
+    return res.json({ ok: true, updated: ids.length });
+  } catch {
+    return res.status(500).json({ error: "Failed to update applications" });
+  }
+});
+
+// 6g. HR: Email templates
+app.get("/api/hr/email-templates", authenticateToken, async (req: any, res: any) => {
+  try {
+    const role = String(req.user.role || "").toUpperCase();
+    if (!HR_VIEW_ROLES.has(role)) {
+      return res.status(403).json({ error: "Forbidden. HR access required." });
+    }
+    const templates = await prisma.emailTemplate.findMany({ where: { hrId: req.user.id }, orderBy: { updatedAt: "desc" } });
+    return res.json(templates);
+  } catch {
+    return res.status(500).json({ error: "Failed to fetch templates" });
+  }
+});
+
+app.post("/api/hr/email-templates", authenticateToken, async (req: any, res: any) => {
+  try {
+    const role = String(req.user.role || "").toUpperCase();
+    if (!HR_WRITE_ROLES.has(role)) {
+      return res.status(403).json({ error: "Forbidden. HR access required." });
+    }
+    const name = String(req.body?.name || "").trim();
+    const subject = String(req.body?.subject || "").trim();
+    const body = String(req.body?.body || "").trim();
+    const type = String(req.body?.type || "CUSTOM").trim();
+    if (!name || !subject || !body) return res.status(400).json({ error: "name, subject, and body are required" });
+
+    const created = await prisma.emailTemplate.create({
+      data: { hrId: req.user.id, name, subject, body, type },
+    });
+    return res.status(201).json(created);
+  } catch {
+    return res.status(500).json({ error: "Failed to create template" });
+  }
+});
+
+app.patch("/api/hr/email-templates/:id", authenticateToken, async (req: any, res: any) => {
+  try {
+    const role = String(req.user.role || "").toUpperCase();
+    if (!HR_WRITE_ROLES.has(role)) {
+      return res.status(403).json({ error: "Forbidden. HR access required." });
+    }
+    const template = await prisma.emailTemplate.findUnique({ where: { id: req.params.id } });
+    if (!template || template.hrId !== req.user.id) {
+      return res.status(404).json({ error: "Template not found" });
+    }
+    const data: any = {};
+    if ("name" in req.body) data.name = String(req.body.name || "").trim();
+    if ("subject" in req.body) data.subject = String(req.body.subject || "").trim();
+    if ("body" in req.body) data.body = String(req.body.body || "").trim();
+    if ("type" in req.body) data.type = String(req.body.type || "CUSTOM").trim();
+    const updated = await prisma.emailTemplate.update({ where: { id: req.params.id }, data });
+    return res.json(updated);
+  } catch {
+    return res.status(500).json({ error: "Failed to update template" });
+  }
+});
+
+app.delete("/api/hr/email-templates/:id", authenticateToken, async (req: any, res: any) => {
+  try {
+    const role = String(req.user.role || "").toUpperCase();
+    if (!HR_WRITE_ROLES.has(role)) {
+      return res.status(403).json({ error: "Forbidden. HR access required." });
+    }
+    const template = await prisma.emailTemplate.findUnique({ where: { id: req.params.id } });
+    if (!template || template.hrId !== req.user.id) {
+      return res.status(404).json({ error: "Template not found" });
+    }
+    await prisma.emailTemplate.delete({ where: { id: req.params.id } });
+    return res.json({ ok: true });
+  } catch {
+    return res.status(500).json({ error: "Failed to delete template" });
+  }
+});
+
 // 7. Jobs: Delete a job (HR/Admin, owner for HR)
 app.delete("/api/jobs/:id", authenticateToken, async (req: any, res: any) => {
   try {
-    if (req.user.role !== "HR" && req.user.role !== "ADMIN") {
+    const role = String(req.user.role || "").toUpperCase();
+    if (!HR_WRITE_ROLES.has(role)) {
       return res.status(403).json({ error: "Forbidden. HR access required." });
     }
 
@@ -579,7 +964,7 @@ app.delete("/api/jobs/:id", authenticateToken, async (req: any, res: any) => {
       return res.status(404).json({ error: "Job not found" });
     }
 
-    if (req.user.role === "HR" && existingJob.hrId !== req.user.id) {
+    if ((role === "HR" || role === "ADMIN_HR") && existingJob.hrId !== req.user.id) {
       return res.status(403).json({ error: "You can only delete your own jobs." });
     }
 
@@ -770,15 +1155,16 @@ app.get("/api/admin/users", authenticateToken, async (req: any, res: any) => {
 // ─── 18. Invites: Create invite (HR/Admin) ────────────────────────────────────
 app.post("/api/invites", authenticateToken, async (req: any, res: any) => {
   try {
-    if (req.user.role !== "HR" && req.user.role !== "ADMIN") {
+    const requesterRole = String(req.user.role || "").toUpperCase();
+    if (!HR_WRITE_ROLES.has(requesterRole)) {
       return res.status(403).json({ error: "HR or Admin access required" });
     }
-    const { email, role = "HR" } = req.body;
+    const { email, role: inviteRole = "HR" } = req.body;
     if (!email) return res.status(400).json({ error: "email is required" });
 
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
     const invite = await prisma.invite.create({
-      data: { email, role, senderId: req.user.id, expiresAt },
+      data: { email, role: inviteRole, senderId: req.user.id, expiresAt },
     });
     return res.status(201).json(invite);
   } catch {

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, CheckCircle2, Image as ImageIcon, Mail, ExternalLink, MapPin, Plus, X } from "lucide-react";
 import { SmartNavbar } from "../../components/SmartNavbar";
-import { useAuthStore } from "../../store/authStore";
+import { canWriteHr, useAuthStore } from "../../store/authStore";
 
 const EMPLOYMENT_TYPES = [
   { v: "FULL_TIME", l: "Full-time" },
@@ -160,13 +160,31 @@ function splitJobDescription(raw: unknown) {
 export function EditJobPage() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { user, token } = useAuthStore();
+  const { user, token, role } = useAuthStore();
+  const canWrite = canWriteHr(role);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [errorStr, setErrorStr] = useState("");
   const [successStr, setSuccessStr] = useState("");
   const [form, setForm] = useState<FormState>(INIT);
+
+  if (!canWrite) {
+    return (
+      <div className="min-h-screen bg-background">
+        <SmartNavbar />
+        <div className="w-full px-6 py-20 md:px-10">
+          <div className="rounded-2xl bg-white p-10 text-center shadow-sm">
+            <h2 className="mb-2 text-xl font-bold">View-only access</h2>
+            <p className="mb-6 text-sm text-muted-foreground">You do not have permission to edit jobs.</p>
+            <button onClick={() => navigate("/hr/jobs")} className="rounded-full bg-foreground px-5 py-2.5 text-sm font-semibold text-white hover:opacity-80 transition">
+              Back to my jobs
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((p) => ({ ...p, [k]: v }));
 

@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, ArrowRight, CheckCircle2, Image as ImageIcon, MapPin, Plus, X, Mail, ExternalLink } from "lucide-react";
 import { SmartNavbar } from "../../components/SmartNavbar";
-import { useAuthStore } from "../../store/authStore";
+import { canWriteHr, useAuthStore } from "../../store/authStore";
 
 /* ─── Constants ─────────────────────────────────────────── */
 const EMPLOYMENT_TYPES = [
@@ -71,7 +71,8 @@ const inp = "w-full rounded-xl border border-border bg-background px-4 py-3 text
 /* ─── Main Component ─────────────────────────────────────── */
 export function PostJobPage() {
   const navigate = useNavigate();
-  const { user, token } = useAuthStore();
+  const { user, token, role } = useAuthStore();
+  const canWrite = canWriteHr(role);
   const [step, setStep] = useState(1);
   const [form, setForm] = useState<FormState>({ ...INIT, universityName: user?.university || "" });
   const [isPending, setIsPending] = useState(false);
@@ -198,6 +199,23 @@ export function PostJobPage() {
 
   /* ── Progress bar ── */
   const steps = ["Job Details", "Description & Skills", "Screening"];
+
+  if (!canWrite) {
+    return (
+      <div className="min-h-screen bg-background">
+        <SmartNavbar />
+        <div className="w-full px-6 py-20 md:px-10">
+          <div className="rounded-2xl bg-white p-10 text-center shadow-sm">
+            <h2 className="mb-2 text-xl font-bold">View-only access</h2>
+            <p className="mb-6 text-sm text-muted-foreground">You do not have permission to post jobs.</p>
+            <button onClick={() => navigate("/hr/dashboard")} className="rounded-full bg-foreground px-5 py-2.5 text-sm font-semibold text-white hover:opacity-80 transition">
+              Back to dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (success) return (
     <div className="min-h-screen bg-background"><SmartNavbar />

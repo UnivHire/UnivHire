@@ -16,8 +16,9 @@ export function ProtectedRoute({ children, requiredRole }: Props) {
 
   if (requiredRole) {
     const allowed = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
-    if (!role || !allowed.includes(role)) {
-      const fallback = role === "hr" ? "/hr/dashboard" : role === "admin" ? "/admin" : "/dashboard";
+    const expanded = allowed.flatMap((r) => (r === "hr" ? ["hr", "admin_hr", "sub_hr"] : [r]));
+    if (!role || !expanded.includes(role)) {
+      const fallback = role === "hr" || role === "admin_hr" || role === "sub_hr" ? "/hr/dashboard" : role === "admin" ? "/admin" : "/dashboard";
       return <Navigate to={fallback} replace />;
     }
   }

@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, PlusCircle, MapPin, Briefcase, Building2, CalendarDays } from "lucide-react";
 import { SmartNavbar } from "../../components/SmartNavbar";
-import { useAuthStore } from "../../store/authStore";
+import { canWriteHr, useAuthStore } from "../../store/authStore";
 
 const ROLE_FILTERS = ["All", "Trainer", "Driver", "Faculty", "Security", "Peon", "Operations", "Admin Staff", "Other"];
 
@@ -20,7 +20,8 @@ function formatPostedDate(iso?: string) {
 
 export function HRJobsPage() {
   const navigate = useNavigate();
-  const { user, token } = useAuthStore();
+  const { user, token, role } = useAuthStore();
+  const canWrite = canWriteHr(role);
   const [jobs, setJobs] = useState<any[]>([]);
   const [isPending, setIsPending] = useState(true);
   const [mutatingJobId, setMutatingJobId] = useState<string | null>(null);
@@ -114,7 +115,12 @@ export function HRJobsPage() {
             >
               Manage Applications
             </button>
-            <button type="button" onClick={() => navigate("/hr/post-job")} className="flex items-center gap-2 rounded-full bg-foreground px-5 py-2.5 text-sm font-semibold text-white hover:opacity-80 transition">
+            <button
+              type="button"
+              disabled={!canWrite}
+              onClick={() => navigate("/hr/post-job")}
+              className="flex items-center gap-2 rounded-full bg-foreground px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-80 disabled:opacity-60"
+            >
               <PlusCircle size={15} /> Post New Job
             </button>
           </div>
@@ -157,11 +163,11 @@ export function HRJobsPage() {
           </div>
         )}
         {!isPending && jobs && jobs.length > 0 && (
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {filteredAndSortedJobs.map((j, i) => (
               <motion.div
                 key={j.id}
-                className="rounded-2xl border border-border bg-white p-5 shadow-sm"
+                className="rounded-xl border border-border bg-white p-4 shadow-sm"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.04 }}
@@ -181,7 +187,7 @@ export function HRJobsPage() {
                     )}
 
                     <div className="min-w-0">
-                      <p className="truncate text-lg font-bold text-foreground">{j.title}</p>
+                      <p className="truncate text-base font-bold text-foreground">{j.title}</p>
                       <p className="truncate text-xs font-medium text-foreground/65">{j.organizationName || user?.university || "University"}</p>
                     </div>
                   </div>
@@ -191,12 +197,12 @@ export function HRJobsPage() {
                   </span>
                 </div>
 
-                <div className="mb-3 flex flex-wrap gap-1.5">
+                <div className="mb-3 flex flex-wrap gap-1">
                   <span className="rounded-full border border-foreground/15 bg-white/60 px-2.5 py-1 text-xs font-medium text-foreground">{j.workplaceType ? String(j.workplaceType).replace("_", "-") : "On-site"}</span>
                   <span className="rounded-full border border-foreground/15 bg-white/60 px-2.5 py-1 text-xs font-medium text-foreground">{j.jobType || "N/A"}</span>
                 </div>
 
-                <p className="mb-4 line-clamp-2 text-sm leading-6 text-foreground/75">
+                <p className="mb-3 line-clamp-2 text-sm leading-5 text-foreground/75">
                   {j.description || "No description added for this posting yet."}
                 </p>
 
@@ -205,10 +211,10 @@ export function HRJobsPage() {
                   <p className="flex items-center gap-1.5"><CalendarDays size={12} />Posted {formatPostedDate(j.createdAt)}</p>
                 </div>
 
-                <div className="flex items-center justify-end gap-2">
+                <div className="flex flex-wrap items-center justify-end gap-2">
                   <button
                     type="button"
-                    disabled={mutatingJobId === j.id}
+                    disabled={mutatingJobId === j.id || !canWrite}
                     onClick={() => editJob(j)}
                     className="rounded-full border border-border px-3.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-background disabled:opacity-60"
                   >
@@ -216,7 +222,7 @@ export function HRJobsPage() {
                   </button>
                   <button
                     type="button"
-                    disabled={mutatingJobId === j.id}
+                    disabled={mutatingJobId === j.id || !canWrite}
                     onClick={() => toggleJobStatus(j)}
                     className="rounded-full border border-amber-200 px-3.5 py-1.5 text-xs font-semibold text-amber-700 transition hover:bg-amber-50 disabled:opacity-60"
                   >
@@ -231,8 +237,9 @@ export function HRJobsPage() {
                   </button>
                   <button
                     type="button"
+                    disabled={!canWrite}
                     onClick={() => { if (window.confirm("Delete this job posting?")) removeJob(j.id); }}
-                    className="rounded-full border border-red-200 px-3.5 py-1.5 text-xs font-medium text-red-500 transition hover:bg-red-50"
+                    className="rounded-full border border-red-200 px-3.5 py-1.5 text-xs font-medium text-red-500 transition hover:bg-red-50 disabled:opacity-60"
                   >
                     Delete
                   </button>

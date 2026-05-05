@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-export type UserRole = "candidate" | "hr" | "admin";
+export type UserRole = "candidate" | "hr" | "admin" | "admin_hr" | "sub_hr";
 
 export interface AuthUser {
   id: string;
@@ -9,6 +9,23 @@ export interface AuthUser {
   email: string;
   roleType?: string;
   university?: string;
+}
+
+export function normalizeRole(role: string | null | undefined): UserRole {
+  const raw = String(role || "").toLowerCase();
+  if (raw === "admin_hr") return "admin_hr";
+  if (raw === "sub_hr") return "sub_hr";
+  if (raw === "admin") return "admin";
+  if (raw === "hr") return "hr";
+  return "candidate";
+}
+
+export function isHrRole(role: UserRole | null | undefined) {
+  return role === "hr" || role === "admin_hr" || role === "sub_hr" || role === "admin";
+}
+
+export function canWriteHr(role: UserRole | null | undefined) {
+  return role === "hr" || role === "admin_hr" || role === "admin";
 }
 
 interface AuthState {
